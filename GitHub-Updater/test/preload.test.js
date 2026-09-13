@@ -63,7 +63,7 @@ test('preload exposes window.api and nothing else', () => {
   const { exposed } = loadPreload();
   assert.ok(exposed, 'contextBridge.exposeInMainWorld was called');
   assert.equal(exposed.name, 'api');
-  assert.deepEqual(Object.keys(exposed.api).sort(), ['getInfo', 'onOutput', 'onState', 'pull', 'restart']);
+  assert.deepEqual(Object.keys(exposed.api).sort(), ['chooseRepository', 'getInfo', 'onOutput', 'onState', 'pull', 'restart']);
 });
 
 test('preload never leaks Node or Electron primitives into the page', () => {

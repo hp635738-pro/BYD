@@ -10,6 +10,12 @@
  *                                         through Windows CMD (cmd.exe) and
  *                                         streams live output to the renderer
  *    - ipcMain.handle('restart-app')   -> app.relaunch() + app.quit()
+ *    - repository-provided UI          -> after "Pull from GitHub" the window
+ *                                         reloads <repo>/GitHub-Updater/renderer
+ *                                         (via an atomic snapshot), so UI/code
+ *                                         updates merged on GitHub appear
+ *                                         without rebuilding or reinstalling
+ *                                         the installed BYD.exe
  *
  *  All paths come from ./config.js — nothing is hardcoded here.
  * ============================================================================
@@ -17,6 +23,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
@@ -405,6 +412,211 @@ function launchProject(onEvent = () => {}) {
 }
 
 /* ================================================================== *
+ *  Repository-provided UI (the "install once" mechanism)
+ * ================================================================== *
+ *  The installed BYD.exe is only a stable bootstrap. The UI it shows
+ *  (index.html / renderer.js / style.css) is taken from the selected
+ *  repository — `<repo>/GitHub-Updater/renderer` — so a `git pull` is
+ *  enough to update the application; no rebuild or reinstall needed.
+ *
+ *  Files are never loaded straight from the working tree. After a pull
+ *  finishes (and on start-up) the renderer folder is validated, hashed
+ *  and copied into `<userData>/ui-cache/<hash>/renderer` — into a temp
+ *  folder first, then renamed into place — so the window can only ever
+ *  load a complete, consistent snapshot. If anything about the
+ *  repository UI is unusable, the packaged renderer is used instead.
+ */
+
+/** Files a usable renderer must provide. */
+const UI_REQUIRED_FILES = Object.freeze(['index.html', 'renderer.js', 'style.css']);
+const UI_REPO_SUBDIR = path.join('GitHub-Updater', 'renderer');
+const UI_CACHE_DIRNAME = 'ui-cache';
+const UI_RELOAD_DELAY_MS = 600; // let the renderer paint the final status first
+
+/** What the window is currently showing. */
+let currentUi = { source: 'packaged', dir: path.join(__dirname, 'renderer'), hash: '' };
+
+function packagedUi() {
+  return { source: 'packaged', dir: path.join(__dirname, 'renderer'), hash: '' };
+}
+
+function uiCacheRoot() {
+  return path.join(app.getPath('userData'), UI_CACHE_DIRNAME);
+}
+
+/** Recursively list files under `dir` (relative, posix separators, sorted). */
+function listFiles(dir, base = '') {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...listFiles(path.join(dir, entry.name), rel));
+    else if (entry.isFile()) out.push(rel);
+  }
+  return out.sort();
+}
+
+/**
+ * Validate `<repoPath>/GitHub-Updater/renderer` and compute a content hash.
+ * Returns `{ ok, dir, hash, files, reason }`; never throws.
+ */
+function inspectRepoUi(repoPath) {
+  const dir = path.join(repoPath, UI_REPO_SUBDIR);
+  try {
+    if (!fs.statSync(dir).isDirectory()) return { ok: false, dir, reason: 'not-a-directory' };
+  } catch {
+    return { ok: false, dir, reason: 'missing' };
+  }
+
+  const missing = UI_REQUIRED_FILES.filter((f) => !fs.existsSync(path.join(dir, f)));
+  if (missing.length) return { ok: false, dir, reason: `missing ${missing.join(', ')}` };
+
+  let files;
+  try {
+    files = listFiles(dir);
+  } catch (err) {
+    return { ok: false, dir, reason: err.message };
+  }
+
+  const hash = crypto.createHash('sha256');
+  try {
+    for (const rel of files) {
+      const data = fs.readFileSync(path.join(dir, rel));
+      hash.update(rel).update('\0').update(data).update('\0');
+      if (rel === 'index.html') {
+        const html = data.toString('utf8');
+        if (!/<html[\s>]/i.test(html) || !/renderer\.js/.test(html)) {
+          return { ok: false, dir, reason: 'index.html is incomplete' };
+        }
+      }
+    }
+  } catch (err) {
+    return { ok: false, dir, reason: err.message };
+  }
+
+  return { ok: true, dir, files, hash: hash.digest('hex').slice(0, 16) };
+}
+
+/**
+ * Copy the repository renderer into an immutable snapshot folder named by
+ * its content hash. Reuses an existing snapshot with the same hash.
+ *
+ * @returns {{source: 'repository', dir: string, hash: string} | null}
+ */
+function snapshotRepoUi(repoPath, log = () => {}) {
+  const info = inspectRepoUi(repoPath);
+  if (!info.ok) {
+    log(`Repository UI not used (${info.reason}) — using the built-in UI.`);
+    return null;
+  }
+
+  const root = uiCacheRoot();
+  const finalDir = path.join(root, info.hash);
+  const rendererDir = path.join(finalDir, 'renderer');
+
+  if (!fs.existsSync(path.join(rendererDir, 'index.html'))) {
+    const tmp = path.join(root, `.tmp-${process.pid}-${Date.now()}`);
+    try {
+      fs.mkdirSync(path.join(tmp, 'renderer'), { recursive: true });
+      for (const rel of info.files) {
+        const dest = path.join(tmp, 'renderer', rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(path.join(info.dir, rel), dest);
+      }
+      // Re-check: if the source changed while we copied, do not publish it.
+      const again = inspectRepoUi(repoPath);
+      if (!again.ok || again.hash !== info.hash) {
+        fs.rmSync(tmp, { recursive: true, force: true });
+        log('Repository UI changed while it was being staged — keeping the current UI.');
+        return null;
+      }
+      try {
+        fs.renameSync(tmp, finalDir);
+      } catch (err) {
+        // Another instance may have published the same hash first.
+        fs.rmSync(tmp, { recursive: true, force: true });
+        if (!fs.existsSync(path.join(rendererDir, 'index.html'))) throw err;
+      }
+    } catch (err) {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      log(`Could not stage the repository UI (${err.message}) — using the built-in UI.`);
+      return null;
+    }
+  }
+
+  return { source: 'repository', dir: rendererDir, hash: info.hash };
+}
+
+/** Delete old snapshots, keeping the hashes listed in `keep`. */
+function pruneUiCache(keep) {
+  const root = uiCacheRoot();
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || keep.includes(entry.name)) continue;
+    if (entry.name.startsWith('.tmp-') && entry.name.includes(`-${process.pid}-`)) continue;
+    fs.rmSync(path.join(root, entry.name), { recursive: true, force: true });
+  }
+}
+
+/**
+ * Decide which UI to show: the repository snapshot when a valid repository
+ * is configured and its renderer is usable, otherwise the packaged one.
+ */
+function resolveUi(log = () => {}) {
+  let repoPath = '';
+  try {
+    repoPath = readConfig().repoPath;
+  } catch {
+    return packagedUi();
+  }
+  const info = inspectRepo(repoPath);
+  if (!info.isGitRepo) return packagedUi();
+  return snapshotRepoUi(repoPath, log) || packagedUi();
+}
+
+/**
+ * Load `ui` into the window. `query` is forwarded to index.html so the
+ * freshly loaded renderer can restore state (e.g. `?pulled=1`).
+ */
+function loadUi(win, ui, query) {
+  if (!win || win.isDestroyed()) return Promise.resolve();
+  currentUi = ui;
+  const entry = path.join(ui.dir, 'index.html');
+  const options = query ? { query } : undefined;
+  return win.loadFile(entry, options).then(() => {
+    // The new page is up; older snapshots are no longer referenced.
+    pruneUiCache([ui.hash]);
+  }).catch((err) => {
+    console.error(`BYD: failed to load the ${ui.source} UI —`, err);
+    if (ui.source !== 'packaged') {
+      const fallback = packagedUi();
+      currentUi = fallback;
+      return win.loadFile(path.join(fallback.dir, 'index.html'), options);
+    }
+  });
+}
+
+/**
+ * After a pull / repository change: re-stage the repository UI and, when
+ * it differs from what is on screen, reload the window into it.
+ * Returns true when a reload was scheduled.
+ */
+function refreshUiAfterChange(query) {
+  const ui = resolveUi((text) => emitToRenderer(IPC.pullOutput, { type: 'stderr', text }));
+  if (ui.source === currentUi.source && ui.hash === currentUi.hash) return false;
+
+  emitToRenderer(IPC.pullState, { type: 'state', text: 'Loading the updated interface…' });
+  setTimeout(() => {
+    loadUi(mainWindow, ui, query);
+  }, UI_RELOAD_DELAY_MS);
+  return true;
+}
+
+/* ================================================================== *
  *  Window
  * ================================================================== */
 
@@ -451,9 +663,7 @@ function createWindow() {
     mainWindow = null;
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html')).catch((err) => {
-    console.error('BYD: failed to load the UI —', err);
-  });
+  loadUi(mainWindow, resolveUi());
 
   return mainWindow;
 }
@@ -487,7 +697,8 @@ function registerIpc() {
     if (!info.isGitRepo) return { ok: false, message: 'Selected folder is not a Git repository.' };
     if (!remoteMatches(selected, config.remote)) return { ok: false, message: 'Selected repository remote must point to hp635738-pro/BYD.' };
     saveRepoPath(selected);
-    return { ok: true, repoPath: selected };
+    const reloading = refreshUiAfterChange({ repoSelected: '1' });
+    return { ok: true, repoPath: selected, reloading };
   });
 
   ipcMain.handle(IPC.info, () => {
@@ -504,18 +715,25 @@ function registerIpc() {
       remote: config.remote || '',
       expectedRepository: config.expectedRepository || '',
       branch: config.branch || '',
-      platform: process.platform
+      platform: process.platform,
+      ui: { source: currentUi.source, hash: currentUi.hash }
     };
   });
 
-  ipcMain.handle(IPC.pull, () =>
-    runGitPull({
+  ipcMain.handle(IPC.pull, async () => {
+    const result = await runGitPull({
       onEvent: (event) => {
         if (event.type === 'state') emitToRenderer(IPC.pullState, event);
         else emitToRenderer(IPC.pullOutput, event);
       }
-    })
-  );
+    });
+    if (result.ok) {
+      // The pull is complete (git has released the working tree), so the
+      // repository UI can now be snapshotted and shown.
+      result.uiReloading = refreshUiAfterChange({ pulled: '1' });
+    }
+    return result;
+  });
 
   ipcMain.handle(IPC.restart, (event) => {
     emitToRenderer(IPC.pullState, { type: 'state', text: 'Restarting…' });
@@ -590,10 +808,19 @@ module.exports = {
   buildGitInvocation,
   launchProject,
   pipeLines,
+  UI_REQUIRED_FILES,
+  UI_REPO_SUBDIR,
+  inspectRepoUi,
+  snapshotRepoUi,
+  resolveUi,
+  loadUi,
+  refreshUiAfterChange,
+  getCurrentUi: () => currentUi,
   /** Test hook: forget the in-flight pull flag. */
   __resetForTests() {
     activePull = null;
     mainWindow = null;
+    currentUi = packagedUi();
   }
 };
 

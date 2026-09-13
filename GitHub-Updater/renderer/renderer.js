@@ -25,7 +25,8 @@ const el = {
   statusDot: document.getElementById('status-dot'),
   statusText: document.getElementById('status-text'),
   output: document.getElementById('output'),
-  repoPath: document.getElementById('repo-path')
+  repoPath: document.getElementById('repo-path'),
+  uiSource: document.getElementById('ui-source')
 };
 
 /** 'idle' | 'pulling' | 'success' | 'error' | 'restarting' */
@@ -107,6 +108,16 @@ async function handlePull() {
 
   setBusy(el.pull, false);
 
+  if (result && result.ok && result.uiReloading) {
+    // The main process is about to reload this window into the freshly
+    // pulled UI files; keep everything locked until the new page takes over.
+    phase = 'restarting';
+    el.pull.disabled = true;
+    el.update.disabled = true;
+    setStatus('Latest code downloaded — loading the updated interface…', 'busy');
+    return;
+  }
+
   if (result && result.ok) {
     phase = 'success';
     setStatus(SUCCESS_MESSAGE, 'success');
@@ -147,7 +158,7 @@ function init() {
     const result = await window.api.chooseRepository();
     if (result && result.ok) {
       el.repoPath.textContent = `Repository: ${result.repoPath}`;
-      setStatus('Repository configured.', 'success');
+      setStatus(result.reloading ? 'Repository configured — loading its interface…' : 'Repository configured.', result.reloading ? 'busy' : 'success');
     } else if (result && !result.canceled) setStatus(result.message || 'Could not configure repository.', 'error');
   });
   el.pull.addEventListener('click', handlePull);
@@ -183,15 +194,31 @@ function init() {
           el.repoPath.textContent = `Repository: ${info.repoPath}`;
           el.repoPath.title = `git pull ${info.remote} ${info.branch} — ${info.repoPath}`;
         }
+        if (el.uiSource && info.ui) {
+          el.uiSource.textContent = info.ui.source === 'repository'
+            ? `Interface: from repository (${info.ui.hash})`
+            : `Interface: built-in v${info.version || ''}`.trim();
+        }
       })
       .catch(() => {
         /* metadata is decorative; ignore failures */
       });
   }
 
+  // When the main process reloads the window right after a successful pull
+  // (so the newly pulled UI files are shown), it passes ?pulled=1. Restore
+  // the post-pull state so "Update" is available exactly as before.
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('pulled') === '1') {
+    phase = 'success';
+    refreshUpdateButton();
+    setStatus(SUCCESS_MESSAGE, 'success');
+    return;
+  }
+
   phase = 'idle';
   refreshUpdateButton();
-  setStatus('Ready.', null);
+  setStatus(params.get('repoSelected') === '1' ? 'Repository configured.' : 'Ready.', params.get('repoSelected') === '1' ? 'success' : null);
 }
 
 init();
