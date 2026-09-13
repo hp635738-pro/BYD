@@ -1,29 +1,39 @@
 /* ==========================================================================
-   GitHub Updater — renderer styles
-   Palette: background #0F172A · card #1E293B · primary blue · update green
+   BYD Electron Updater — premium automotive-tech theme
+   Palette: bg #0B0D10 · surface/card #15181D · border #2A2E35
+            accent red #E60012 · hover red #FF0F1F · text #FFFFFF
+            muted #9CA3AF · success #16A34A · error #E60012
+   Notes: minimal, clean, no heavy gradients — centred and polished on
+          a maximised 1920×1080 window. All interactions have clear
+          hover / active / focus / disabled states with good contrast.
    ========================================================================== */
 
 :root {
-  --bg: #0f172a;
-  --bg-soft: #131f38;
-  --card: #1e293b;
-  --card-border: #2b3a52;
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --faint: #64748b;
+  --bg: #0B0D10;
+  --surface: #15181D;
+  --card: #15181D;
+  --border: #2A2E35;
+  --border-strong: #323842;
 
-  --blue: #3b82f6;
-  --blue-hover: #2563eb;
-  --blue-glow: rgba(59, 130, 246, 0.45);
+  --text: #FFFFFF;
+  --muted: #9CA3AF;
+  --faint: #6B7280;
 
-  --green: #22c55e;
-  --green-hover: #16a34a;
-  --green-glow: rgba(34, 197, 94, 0.4);
+  --red: #E60012;
+  --red-hover: #FF0F1F;
+  --red-active: #C40010;
+  --red-glow: rgba(230, 0, 18, 0.32);
+  --red-focus: rgba(230, 0, 18, 0.42);
+  --red-soft: rgba(230, 0, 18, 0.10);
 
-  --red: #f87171;
-  --amber: #fbbf24;
+  --green: #16A34A;
+  --green-hover: #1AB054;
+  --green-active: #15803D;
+  --green-glow: rgba(22, 163, 74, 0.32);
+  --green-soft: rgba(22, 163, 74, 0.10);
 
   --radius: 16px;
+  --radius-btn: 10px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -38,27 +48,29 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(120% 90% at 50% -10%, var(--bg-soft) 0%, var(--bg) 55%) no-repeat,
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Everything centred vertically + horizontally. */
+/* ------------------------------------------------------------------ */
+/*  Shell — centred vertically + horizontally, polished when maximised */
+/* ------------------------------------------------------------------ */
+
 .shell {
   height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 22px 24px 16px;
+  gap: 20px;
+  padding: 32px 24px 24px;
   text-align: center;
 }
 
@@ -68,20 +80,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .title {
   margin: 0;
-  font-size: 23px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: #f8fafc;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .subtitle {
   margin: 0;
   font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
   color: var(--muted);
 }
 
@@ -89,17 +104,17 @@ body {
 
 .card {
   width: 100%;
-  max-width: 720px;
-  padding: 16px;
+  max-width: 460px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(180deg, #22304a 0%, var(--card) 45%);
-  border: 1px solid var(--card-border);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow:
-    0 18px 38px rgba(2, 6, 23, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 1px 0 rgba(255, 255, 255, 0.03) inset;
 }
 
 /* ------------------------------- Buttons ------------------------------- */
@@ -108,31 +123,34 @@ body {
   position: relative;
   width: 100%;
   min-height: 44px;
-  padding: 11px 16px;
+  padding: 11px 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
   border: 1px solid transparent;
-  border-radius: 12px;
-  color: #f8fafc;
+  border-radius: var(--radius-btn);
+  color: var(--text);
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.15px;
+  line-height: 1;
   cursor: pointer;
   overflow: hidden;
   transition:
     transform 0.18s var(--ease),
     background-color 0.18s var(--ease),
+    border-color 0.18s var(--ease),
     box-shadow 0.18s var(--ease),
     opacity 0.18s var(--ease),
     filter 0.18s var(--ease);
 }
 
 .btn:focus-visible {
-  outline: 2px solid #93c5fd;
+  outline: 2px solid var(--red);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--red-soft);
 }
 
 .btn:hover:not(:disabled) {
@@ -147,33 +165,83 @@ body {
   cursor: not-allowed;
   opacity: 0.45;
   filter: saturate(0.55);
-  box-shadow: none;
-  transform: none;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
+/* secondary — repository folder picker (dark, subtle border) */
 .btn-secondary {
-  background: #334155;
-  border-color: #475569;
+  background: #1E232A;
+  border-color: var(--border);
+  color: #E5E7EB;
+  box-shadow: none;
 }
 
+.btn-secondary:hover:not(:disabled) {
+  background: #252A33;
+  border-color: var(--border-strong);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+
+.btn-secondary:active:not(:disabled) {
+  background: #1A1E24;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.btn-secondary:focus-visible {
+  outline-color: #3A404C;
+  box-shadow: 0 0 0 4px rgba(42, 46, 53, 0.55);
+}
+
+/* primary — Pull from GitHub (clean red) */
 .btn-primary {
-  background: linear-gradient(180deg, var(--blue) 0%, var(--blue-hover) 100%);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  background: var(--red);
+  border-color: var(--red);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--red-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #4f8ff7 0%, var(--blue) 100%);
-  box-shadow: 0 10px 22px var(--blue-glow);
+  background: var(--red-hover);
+  border-color: var(--red-hover);
+  box-shadow: 0 6px 18px rgba(230, 0, 18, 0.38);
 }
 
+.btn-primary:active:not(:disabled) {
+  background: var(--red-active);
+  border-color: var(--red-active);
+  box-shadow: 0 2px 8px rgba(230, 0, 18, 0.28);
+}
+
+/* success — Update (tasteful green, visually distinct) */
 .btn-success {
-  background: linear-gradient(180deg, var(--green) 0%, var(--green-hover) 100%);
-  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.32);
+  background: var(--green);
+  border-color: var(--green);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--green-glow);
 }
 
 .btn-success:hover:not(:disabled) {
-  background: linear-gradient(180deg, #34d06d 0%, var(--green) 100%);
-  box-shadow: 0 10px 22px var(--green-glow);
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.36);
+}
+
+.btn-success:active:not(:disabled) {
+  background: var(--green-active);
+  border-color: var(--green-active);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+}
+
+/* distinct disabled look for Update — keeps hierarchy when unavailable */
+.btn-success:disabled {
+  background: #1E232A;
+  border-color: var(--border);
+  color: var(--muted);
+  opacity: 0.5;
+  box-shadow: none;
 }
 
 .btn-label {
@@ -181,7 +249,7 @@ body {
   z-index: 1;
 }
 
-/* Spinner shown while a git command is running. */
+/* Spinner shown while a git command is running */
 .btn.is-busy .btn-label::after {
   content: "";
   display: inline-block;
@@ -189,8 +257,8 @@ body {
   height: 12px;
   margin-left: 9px;
   vertical-align: -1px;
-  border: 2px solid rgba(248, 250, 252, 0.35);
-  border-top-color: #f8fafc;
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  border-top-color: #FFFFFF;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -205,10 +273,10 @@ body {
 
 .status {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .status-line {
@@ -216,13 +284,16 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 22px;
+  min-height: 28px;
   padding: 7px 14px;
   border-radius: 999px;
-  background: rgba(30, 41, 59, 0.72);
-  border: 1px solid var(--card-border);
-  transition: color 0.2s var(--ease), background-color 0.2s var(--ease),
-    border-color 0.2s var(--ease);
+  background: rgba(21, 24, 29, 0.9);
+  border: 1px solid var(--border);
+  transition:
+    color 0.2s var(--ease),
+    background-color 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
 }
 
 .status-dot {
@@ -236,6 +307,7 @@ body {
 
 .status-text {
   font-size: 12.5px;
+  font-weight: 450;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -243,19 +315,25 @@ body {
   max-width: 100%;
 }
 
+/* busy — subtle red pulse */
+.status-line.is-busy {
+  background: rgba(21, 24, 29, 0.95);
+  border-color: var(--border);
+}
+
 .status-line.is-busy .status-dot {
-  background: var(--blue);
-  box-shadow: 0 0 0 0 var(--blue-glow);
-  animation: pulse 1.25s var(--ease) infinite;
+  background: var(--red);
+  box-shadow: 0 0 0 0 var(--red-glow);
+  animation: pulse-red 1.25s var(--ease) infinite;
 }
 
 .status-line.is-busy .status-text {
-  color: #bfdbfe;
+  color: #E5E7EB;
 }
 
 .status-line.is-success {
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.45);
+  background: var(--green-soft);
+  border-color: rgba(22, 163, 74, 0.32);
 }
 
 .status-line.is-success .status-dot {
@@ -264,86 +342,99 @@ body {
 }
 
 .status-line.is-success .status-text {
-  color: #86efac;
+  color: #86EFAC;
   font-weight: 600;
 }
 
 .status-line.is-error {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.45);
+  background: var(--red-soft);
+  border-color: rgba(230, 0, 18, 0.32);
 }
 
 .status-line.is-error .status-dot {
   background: var(--red);
-  box-shadow: 0 0 10px rgba(248, 113, 113, 0.45);
+  box-shadow: 0 0 10px rgba(230, 0, 18, 0.38);
 }
 
 .status-line.is-error .status-text {
-  color: #fca5a5;
+  color: #FCA5A5;
   font-weight: 600;
 }
 
-@keyframes pulse {
+@keyframes pulse-red {
   0% {
-    box-shadow: 0 0 0 0 var(--blue-glow);
+    box-shadow: 0 0 0 0 var(--red-glow);
   }
   70% {
-    box-shadow: 0 0 0 7px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 7px rgba(230, 0, 18, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(230, 0, 18, 0);
   }
 }
 
-/* Live git output console. */
+/* Live git output console */
 .output {
   margin: 0;
-  max-height: 104px;
-  padding: 10px 12px;
+  max-height: 112px;
+  padding: 12px 14px;
   overflow-y: auto;
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
   font-family: "Cascadia Mono", "Consolas", "Courier New", monospace;
   font-size: 11.5px;
-  line-height: 1.5;
-  color: #cbd5e1;
-  background: rgba(2, 6, 23, 0.72);
-  border: 1px solid var(--card-border);
+  line-height: 1.55;
+  color: #D1D5DB;
+  background: #0F1215;
+  border: 1px solid var(--border);
   border-radius: 12px;
   user-select: text;
 }
 
 .output .line-err {
-  color: var(--red);
+  color: #FCA5A5;
 }
 
 .output .line-out {
-  color: #cbd5e1;
+  color: #D1D5DB;
 }
 
 .output::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 .output::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #2A2E35;
   border-radius: 8px;
+  border: 1px solid #1E232A;
+}
+
+.output::-webkit-scrollbar-thumb:hover {
+  background: #323842;
+}
+
+.output::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* -------------------------------- Footer ------------------------------- */
 
 .footer {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   min-height: 14px;
 }
 
 .repo-path {
   font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.1px;
   color: var(--faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
+  opacity: 0.9;
 }
