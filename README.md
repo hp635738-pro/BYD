@@ -1,4 +1,4 @@
-# BMD
+# BYD
 
 Main project lives here. The standalone Windows **BYD** updater utility — a separate,
 self-contained Electron app that pulls this repository from GitHub and relaunches it — is in:

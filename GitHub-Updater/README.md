@@ -19,7 +19,7 @@ logo (`assets/logo.png` → `assets/icon.ico`).
 │   │ Updating 1a2b3c4..5d6e7f8             │   │
 │   │ Fast-forward                          │   │
 │   └───────────────────────────────────────┘   │
-│            Repository: C:\HPOS                │
+│            Repository: the selected BYD repository folder                │
 └───────────────────────────────────────────────┘
 ```
 
@@ -94,8 +94,8 @@ npm run pack           # unpacked build only (dist/win-unpacked), no installer
 
 1. Open a terminal in the `GitHub-Updater` folder.
 2. `npm install`
-3. Edit `config.js` → set `repoPath` to the project folder this updater manages
-   (e.g. `C:\\HPOS`). **Do this before building** — the path is baked into the .exe.
+3. Use “Choose BYD repository folder” to select the local clone
+   (e.g. `C:\\HPOS`). **Do this before building** — the selection is saved per Windows user.
 4. `npm run build`
 5. Find the outputs in `dist\`:
    `BYD-1.0.0-Setup.exe` (installer) and `BYD-1.0.0-Portable.exe` (single file).
@@ -229,7 +229,7 @@ Hardening: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, 
 
 | Symptom | Cause / fix |
 | --- | --- |
-| `Folder not found: C:\HPOS` | `repoPath` in `config.js` is wrong, or the build predates the edit |
+| `Folder not found: the selected BYD repository folder` | no repository has been selected yet; choose the local BYD clone |
 | `Not a Git repository: …` | the folder exists but has no `.git` |
 | `Git was not found.` | install Git for Windows, ensure `git` is on `PATH` |
 | `Authentication failed` | run `git pull` once in a terminal so the credential helper caches a token |

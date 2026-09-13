@@ -89,7 +89,7 @@ body {
 
 .card {
   width: 100%;
-  max-width: 340px;
+  max-width: 720px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -149,6 +149,11 @@ body {
   filter: saturate(0.55);
   box-shadow: none;
   transform: none;
+}
+
+.btn-secondary {
+  background: #334155;
+  border-color: #475569;
 }
 
 .btn-primary {

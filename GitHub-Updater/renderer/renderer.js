@@ -18,6 +18,7 @@ const SUCCESS_MESSAGE = 'Latest code downloaded successfully.';
 const MAX_OUTPUT_LINES = 400;
 
 const el = {
+  select: document.getElementById('btn-select'),
   pull: document.getElementById('btn-pull'),
   update: document.getElementById('btn-update'),
   statusLine: document.getElementById('status-line'),
@@ -142,6 +143,13 @@ async function handleUpdate() {
  * ------------------------------------------------------------------ */
 
 function init() {
+  el.select.addEventListener('click', async () => {
+    const result = await window.api.chooseRepository();
+    if (result && result.ok) {
+      el.repoPath.textContent = `Repository: ${result.repoPath}`;
+      setStatus('Repository configured.', 'success');
+    } else if (result && !result.canceled) setStatus(result.message || 'Could not configure repository.', 'error');
+  });
   el.pull.addEventListener('click', handlePull);
   el.update.addEventListener('click', handleUpdate);
 
