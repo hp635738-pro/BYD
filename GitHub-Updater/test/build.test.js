@@ -148,10 +148,9 @@ test('the icon is consumable by the PE resource editor electron-builder uses', (
   assert.ok(sizes.includes(16), 'a 16x16 entry is required for the title bar');
 });
 
-test('config.js is the single source of truth for the repository path', () => {
+test('config.js holds the git defaults and no repository path is hardcoded anywhere', () => {
   const config = require(path.join(APP_DIR, 'config.js'));
-  assert.equal(typeof config.repoPath, 'string');
-  assert.ok(config.repoPath.trim().length > 0, 'repoPath must be set');
+  assert.equal('repoPath' in config, false, 'the repository is chosen by the user, not hardcoded');
   assert.equal(typeof config.remote, 'string');
   assert.equal(typeof config.branch, 'string');
   assert.ok(config.remote && config.branch, 'remote and branch must be set');

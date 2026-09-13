@@ -64,8 +64,10 @@ function makeElectronStub() {
     isDestroyed() {
       return this.destroyed;
     }
-    loadFile(file) {
+    loadFile(file, options) {
       this.loaded = file;
+      this.loadedOptions = options || null;
+      this.loads = (this.loads || 0) + 1;
       return Promise.resolve();
     }
     static getAllWindows() {
@@ -74,8 +76,11 @@ function makeElectronStub() {
   }
   FakeBrowserWindow.instances = [];
 
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'ghupdater-userdata-'));
+
   const app = {
     isPackaged: false,
+    getPath: (name) => (name === 'userData' ? userData : os.tmpdir()),
     whenReady: () => new Promise(() => {}), // never resolves: tests drive things directly
     requestSingleInstanceLock: () => true,
     on: (event, fn) => {
@@ -113,6 +118,7 @@ function makeElectronStub() {
     ipcRenderer: { invoke: async () => {}, on: () => {}, removeListener: () => {} },
     __handlers: handlers,
     __calls: calls,
+    __userData: userData,
     __appListeners: appListeners
   };
 
@@ -157,7 +163,15 @@ function loadMain() {
   const main = require(mainPath);
   main.__resetForTests();
 
-  return { main, config, electron };
+  /** Persist a repository path exactly like the folder picker does. */
+  const setRepoPath = (repoPath) => {
+    const file = path.join(electron.__userData, 'settings.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (repoPath === null) fs.rmSync(file, { force: true });
+    else fs.writeFileSync(file, JSON.stringify({ repoPath }), 'utf8');
+  };
+
+  return { main, config, electron, setRepoPath, userData: electron.__userData };
 }
 
 /* ------------------------- real git fixtures ---------------------------- */
@@ -192,6 +206,10 @@ function makeRepoFixture() {
   git(['push', 'origin', 'main'], seed);
 
   git(['clone', remote, local], root);
+  // The updater only accepts hp635738-pro/BYD as `origin`; point the URL at
+  // GitHub but keep fetching from the local bare repo via insteadOf.
+  git(['config', 'remote.origin.url', 'https://github.com/hp635738-pro/BYD.git'], local);
+  git(['config', `url.${remote}.insteadOf`, 'https://github.com/hp635738-pro/BYD.git'], local);
 
   // New commit on the remote that the local clone does not have yet.
   fs.writeFileSync(path.join(seed, 'pulled.txt'), 'fresh from origin/main\n');
@@ -202,4 +220,20 @@ function makeRepoFixture() {
   return { root, remote, seed, local };
 }
 
-module.exports = { loadMain, makeElectronStub, makeRepoFixture, git, APP_DIR };
+/**
+ * Commit a GitHub-Updater/renderer UI (with the given CSS) to the fixture's
+ * remote so the next `git pull` brings it into the local clone.
+ */
+function pushRendererToRemote(fixture, { css = 'body { background: #0B0D10; }\n', js = "'use strict';\n" } = {}) {
+  const dir = path.join(fixture.seed, 'GitHub-Updater', 'renderer');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!DOCTYPE html><html><head><link rel="stylesheet" href="style.css"></head><body><script src="renderer.js"></script></body></html>\n');
+  fs.writeFileSync(path.join(dir, 'style.css'), css);
+  fs.writeFileSync(path.join(dir, 'renderer.js'), js);
+  git(['add', '.'], fixture.seed);
+  git(['commit', '-m', 'ui: renderer update'], fixture.seed);
+  git(['push', 'origin', 'main'], fixture.seed);
+}
+
+module.exports = { loadMain, makeElectronStub, makeRepoFixture, pushRendererToRemote, git, APP_DIR };
+

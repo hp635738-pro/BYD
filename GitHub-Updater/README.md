@@ -23,7 +23,46 @@ logo (`assets/logo.png` → `assets/icon.ico`).
 └───────────────────────────────────────────────┘
 ```
 
-520×420 · non-resizable · centred · dark modern UI · rounded cards · no menu bar.
+Opens maximised · resizable · normal Windows controls · dark black/red UI · rounded cards · no menu bar.
+
+---
+
+## Install once, then only "Pull from GitHub"
+
+The installed `BYD.exe` is a **stable bootstrap**. The interface it shows is **not** taken from
+the packaged `app.asar` once a repository has been selected — it is taken from the local
+clone itself:
+
+```
+<selected repository>\GitHub-Updater\renderer\   (index.html, renderer.js, style.css)
+```
+
+So the end-user workflow for every UI/code change merged on GitHub is simply:
+
+1. Open the installed **BYD**.
+2. (First time only) **Choose BYD repository folder** → select the local clone.
+3. Click **Pull from GitHub** → `git pull origin main` runs.
+4. As soon as the pull finishes, the window **reloads into the freshly pulled UI files**.
+   No `npm`, no rebuild, no reinstall.
+
+How it works (see `main.js`, "Repository-provided UI"):
+
+* On start-up and after every successful pull, `GitHub-Updater/renderer` in the repository is
+  validated (all three files present, `index.html` complete) and hashed.
+* The files are copied into an **immutable snapshot** — `%APPDATA%\BYD\ui-cache\<hash>\renderer`
+  — written to a temp folder first and then renamed into place, so the window never loads a
+  half-updated working tree. Git has already finished (the pull promise has resolved) before
+  staging starts, and the hash is re-checked after copying.
+* If the snapshot differs from what is on screen, the window is reloaded into it with
+  `?pulled=1`, so the new page comes up already showing *Latest code downloaded successfully.*
+  with **Update** enabled. If nothing changed, no reload happens.
+* If the repository UI is missing or broken, the **packaged renderer** is used instead and the
+  reason is printed in the console, so the app can never come up blank.
+* The footer shows which interface is in use: `Interface: from repository (<hash>)` or
+  `Interface: built-in v1.0.0`.
+
+`npm install` / `npm run build` are therefore **developer-only** steps, needed only when
+releasing a new bootstrap (changes to `main.js`, `preload.js` or `config.js`).
 
 ---
 
@@ -35,7 +74,7 @@ GitHub-Updater/
 ├── package.json          app manifest + electron-builder configuration
 ├── main.js               Electron main process: window, git pull, relaunch
 ├── preload.js            contextBridge -> window.api
-├── config.js             THE ONLY FILE THAT CONTAINS PATHS
+├── config.js             git defaults (remote/branch/expected origin) — no paths
 │
 ├── renderer/
 │   ├── index.html        two buttons in one centred card + status area
@@ -51,7 +90,7 @@ GitHub-Updater/
 ├── tools/
 │   ├── make-icon.js      regenerates assets/icon.ico from logo.png (ImageMagick), glyph fallback
 │   └── verify-package.js asserts the payload that ships inside the .exe
-└── test/                 55 automated tests (node:test + jsdom)
+└── test/                 65 automated tests (node:test + jsdom)
 ```
 
 ---
@@ -77,7 +116,7 @@ Both embed the app in `app.asar` and carry the BYD `assets/icon.ico` as the exec
 Other commands:
 
 ```bash
-npm test               # 55 tests: main process, preload bridge, renderer UI, packaging
+npm test               # 65 tests: main process, preload bridge, renderer UI, packaging
 npm run verify:package # build app.asar and assert exactly what ships inside the .exe
 npm run icon           # regenerate assets/icon.ico from assets/logo.png (ImageMagick)
 npm run pack           # unpacked build only (dist/win-unpacked), no installer
@@ -110,9 +149,11 @@ It creates a desktop + start-menu shortcut named **BYD**. Launch from the shortc
 
 **C. Use it**
 
-1. Open the app → click **Pull from GitHub** (live git output appears; button locks while running).
-2. On success you see the green `Latest code downloaded successfully.` and **Update** unlocks.
-3. Click **Update** → the app relaunches and the newly pulled code loads.
+1. Open the app → **Choose BYD repository folder** (first time only; it is remembered).
+2. Click **Pull from GitHub** (live git output appears; button locks while running).
+3. On success the window reloads into the pulled `GitHub-Updater/renderer` files, shows the
+   green `Latest code downloaded successfully.` and **Update** unlocks.
+4. Click **Update** → the app relaunches (and starts `projectLaunch`, if configured).
 
 **Notes**
 
@@ -125,22 +166,24 @@ It creates a desktop + start-menu shortcut named **BYD**. Launch from the shortc
 
 ## Configuration — `config.js`
 
-This is the **only** file in the project that contains a path. `main.js`, `preload.js` and
-the renderer all read the repository location from here; a test
-(`no filesystem path is hardcoded outside config.js`) fails the build if that ever changes.
+Git defaults only — the repository folder is **not** hardcoded anywhere. It is chosen by the
+user with **Choose BYD repository folder** and saved per Windows user in
+`%APPDATA%\BYD\settings.json`. A test (`no filesystem path is hardcoded outside config.js`)
+fails the build if a path literal ever appears in the sources.
 
 ```js
 module.exports = {
-  repoPath: 'C:\\HPOS',   // <- the local repository this updater manages
   remote: 'origin',       // -> git pull origin main
   branch: 'main',
+  expectedRepository: 'https://github.com/hp635738-pro/BYD.git', // origin must match this repo
   timeoutMs: 120000,      // abort a hung pull after 2 minutes
   projectLaunch: null     // see "Standalone vs. self-update" below
 };
 ```
 
-**Packaged builds:** once compiled, `config.js` lives inside `app.asar`, so edit it *before*
-running `npm run build`.
+**Packaged builds:** `config.js` lives inside `app.asar` (part of the bootstrap), so changing
+it requires a new developer build. Normal UI/code changes do **not** — see
+"Install once, then only Pull from GitHub" above.
 
 ---
 
@@ -201,10 +244,11 @@ Leave it `null` for the plain relaunch behaviour.
 | --- | --- | --- | --- |
 | `main.js` | `ipcMain.handle('git-pull')` | renderer → main | `PullResult` |
 | `main.js` | `ipcMain.handle('restart-app')` | renderer → main | `{ ok, relaunching }` |
-| `main.js` | `ipcMain.handle('app-info')` | renderer → main | version / repoPath / remote / branch |
+| `main.js` | `ipcMain.handle('app-info')` | renderer → main | version / repoPath / remote / branch / `ui: { source, hash }` |
+| `main.js` | `ipcMain.handle('choose-repository')` | renderer → main | `{ ok, repoPath, reloading }` |
 | `main.js` | `webContents.send('git-pull:output')` | main → renderer | `{ type: 'stdout'\|'stderr'\|'done', text }` |
 | `main.js` | `webContents.send('git-pull:state')` | main → renderer | `{ type: 'state', text }` |
-| `preload.js` | `window.api.pull()` / `.restart()` / `.getInfo()` | — | Promise |
+| `preload.js` | `window.api.pull()` / `.restart()` / `.getInfo()` / `.chooseRepository()` | — | Promise |
 | `preload.js` | `window.api.onOutput(cb)` / `.onState(cb)` | — | returns `unsubscribe()` |
 
 Hardening: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, a strict CSP
@@ -239,7 +283,7 @@ Hardening: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, 
 
 ## Verification status
 
-What was actually executed against this code (`npm test`, 55 tests, all passing):
+What was actually executed against this code (`npm test`, 65 tests, all passing):
 
 * **Real `git pull` against a real repository.** A throwaway bare remote + local clone is
   created, a commit is pushed to `origin/main`, then `main.js`'s `runGitPull()` is called.
@@ -256,8 +300,15 @@ What was actually executed against this code (`npm test`, 55 tests, all passing)
 * The **real `renderer.js`** is evaluated in a jsdom DOM built from the real `index.html`:
   button enable/disable rules, the exact success string, green/red status classes, live
   output rendering, double-click guarding, restart locking.
-* `createWindow()` is asserted to produce a 520×420, non-resizable, centred, `#0F172A`,
+* `createWindow()` is asserted to produce a resizable, maximizable, centred, `#0B0D10`,
   menu-less, context-isolated window.
+* **Repository-provided UI, end to end:** a renderer with one `style.css` is pushed to the
+  fixture remote, the app pulls it, and the test asserts the window was reloaded into a
+  `ui-cache/<hash>/renderer/index.html` snapshot with `?pulled=1`. Then a *different*
+  `style.css` is pushed, "Pull from GitHub" is invoked again, and the test asserts the new CSS
+  is what the window now loads, the old snapshot is pruned, and no temp folders are left.
+  A pull with no changes triggers no reload; a broken repository UI falls back to the packaged
+  renderer.
 * Packaging: `npm run verify:package` packs the `build.files` set into an `app.asar` with the
   same `@electron/asar` library electron-builder uses and confirms every runtime file is
   inside, dev-only material is not, and `main.js` is byte-identical. The `.ico` is parsed by

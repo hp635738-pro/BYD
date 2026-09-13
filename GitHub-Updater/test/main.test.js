@@ -10,21 +10,23 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const { loadMain, makeRepoFixture, APP_DIR } = require('./helpers');
+const { loadMain, makeRepoFixture, pushRendererToRemote, APP_DIR } = require('./helpers');
 
 /* ================================================================== *
  *  Configuration
  * ================================================================== */
 
-test('readConfig() rejects a blank repoPath with an actionable message', () => {
-  const { main, config } = loadMain();
-  config.repoPath = '';
-  assert.throws(() => main.readConfig(), /repoPath is not set/);
+test('readConfig() rejects a missing saved repository with an actionable message', () => {
+  const { main, setRepoPath } = loadMain();
+  setRepoPath(null);
+  assert.throws(() => main.readConfig(), /No repository is configured/);
+  setRepoPath('   ');
+  assert.throws(() => main.readConfig(), /No repository is configured/);
 });
 
-test('readConfig() resolves the configured path to an absolute path', () => {
-  const { main, config } = loadMain();
-  config.repoPath = './some/relative/folder';
+test('readConfig() resolves the saved path to an absolute path', () => {
+  const { main, setRepoPath } = loadMain();
+  setRepoPath('./some/relative/folder');
   const cfg = main.readConfig();
   assert.equal(path.isAbsolute(cfg.repoPath), true);
   assert.equal(cfg.remote, 'origin');
@@ -32,8 +34,8 @@ test('readConfig() resolves the configured path to an absolute path', () => {
 });
 
 test('readConfig() rejects a missing remote or branch', () => {
-  const { main, config } = loadMain();
-  config.repoPath = 'C:\\HPOS';
+  const { main, config, setRepoPath } = loadMain();
+  setRepoPath(path.join(require('node:os').tmpdir(), 'byd'));
   config.branch = '  ';
   assert.throws(() => main.readConfig(), /remote and branch must be set/);
 });
@@ -81,9 +83,9 @@ test('buildGitInvocation() calls git directly off Windows (so CI can run it)', (
  * ================================================================== */
 
 test('runGitPull() fast-forwards a real repository and reports success', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const fixture = makeRepoFixture();
-  config.repoPath = fixture.local;
+  setRepoPath(fixture.local);
 
   assert.equal(fs.existsSync(path.join(fixture.local, 'pulled.txt')), false, 'precondition: commit not present yet');
 
@@ -99,9 +101,9 @@ test('runGitPull() fast-forwards a real repository and reports success', async (
 });
 
 test('runGitPull() streams live stdout events as the command runs', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const fixture = makeRepoFixture();
-  config.repoPath = fixture.local;
+  setRepoPath(fixture.local);
 
   const events = [];
   await main.runGitPull({ onEvent: (e) => events.push(e) });
@@ -117,11 +119,13 @@ test('runGitPull() streams live stdout events as the command runs', async () => 
 });
 
 test('runGitPull() reports failure with stderr when the remote is unreachable', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const fixture = makeRepoFixture();
-  // Point the clone at a remote that does not exist.
-  require('./helpers').git(['remote', 'set-url', 'origin', path.join(fixture.root, 'nope.git')], fixture.local);
-  config.repoPath = fixture.local;
+  // Keep the GitHub origin URL (so validation passes) but redirect it to a
+  // remote that does not exist.
+  require('./helpers').git(['config', `url.${path.join(fixture.root, 'nope.git')}.insteadOf`, 'https://github.com/hp635738-pro/BYD.git'], fixture.local);
+  require('./helpers').git(['config', '--unset', `url.${fixture.remote}.insteadOf`], fixture.local);
+  setRepoPath(fixture.local);
 
   const result = await main.runGitPull();
 
@@ -133,23 +137,22 @@ test('runGitPull() reports failure with stderr when the remote is unreachable', 
 });
 
 test('runGitPull() fails cleanly when the configured folder does not exist', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const missing = path.join(require('node:os').tmpdir(), 'ghupdater-does-not-exist-xyz');
-  config.repoPath = missing;
+  setRepoPath(missing);
 
   const result = await main.runGitPull();
 
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'missing-folder');
   assert.ok(result.message.includes(missing), 'the message names the missing folder');
-  assert.match(result.stderr, /config\.js/);
 });
 
 test('runGitPull() fails cleanly when the folder is not a git repository', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const os = require('node:os');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghupdater-norepo-'));
-  config.repoPath = dir;
+  setRepoPath(dir);
 
   const result = await main.runGitPull();
 
@@ -158,21 +161,34 @@ test('runGitPull() fails cleanly when the folder is not a git repository', async
   assert.match(result.stderr, /no \.git directory/);
 });
 
-test('runGitPull() fails cleanly when config.js has no repoPath', async () => {
-  const { main, config } = loadMain();
-  config.repoPath = '';
+test('runGitPull() fails cleanly when no repository has been chosen', async () => {
+  const { main, setRepoPath } = loadMain();
+  setRepoPath(null);
 
   const result = await main.runGitPull();
 
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'config');
-  assert.match(result.stderr, /repoPath is not set/);
+  assert.match(result.stderr, /No repository is configured/);
+});
+
+test('runGitPull() refuses a repository whose origin is not hp635738-pro/BYD', async () => {
+  const { main, setRepoPath } = loadMain();
+  const fixture = makeRepoFixture();
+  require('./helpers').git(['remote', 'set-url', 'origin', 'https://github.com/someone-else/other.git'], fixture.local);
+  setRepoPath(fixture.local);
+
+  const result = await main.runGitPull();
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'wrong-remote');
+  assert.match(result.message, /hp635738-pro\/BYD/);
 });
 
 test('runGitPull() refuses to start a second pull while one is running', async () => {
-  const { main, config } = loadMain();
+  const { main, setRepoPath } = loadMain();
   const fixture = makeRepoFixture();
-  config.repoPath = fixture.local;
+  setRepoPath(fixture.local);
 
   const first = main.runGitPull(); // sets the in-flight flag synchronously
   const second = await main.runGitPull();
@@ -191,12 +207,12 @@ test('runGitPull() refuses to start a second pull while one is running', async (
 });
 
 test('runGitPull() aborts a hung pull after the configured timeout', async () => {
-  const { main, config } = loadMain();
+  const { main, config, setRepoPath } = loadMain();
   const os = require('node:os');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghupdater-hang-'));
   // A real repo so the validation passes, but make `git` hang on a lock.
   const fixture = makeRepoFixture();
-  config.repoPath = fixture.local;
+  setRepoPath(fixture.local);
   config.timeoutMs = 400;
 
   // Freeze the index so `git pull` blocks waiting for index.lock.
@@ -240,13 +256,13 @@ test('registerIpc() exposes exactly the channels preload.js expects', () => {
   main.registerIpc();
 
   const channels = [...electron.__handlers.keys()].sort();
-  assert.deepEqual(channels, ['app-info', 'git-pull', 'restart-app']);
+  assert.deepEqual(channels, ['app-info', 'choose-repository', 'git-pull', 'restart-app']);
 });
 
 test('the git-pull IPC handler pushes live output to the renderer', async () => {
-  const { main, config, electron } = loadMain();
+  const { main, setRepoPath, electron } = loadMain();
   const fixture = makeRepoFixture();
-  config.repoPath = fixture.local;
+  setRepoPath(fixture.local);
 
   main.registerIpc();
   const window = await main.createWindow();
@@ -279,13 +295,15 @@ test('the restart-app IPC handler relaunches and quits the app', async () => {
 });
 
 test('the app-info IPC handler reports the configured repository', async () => {
-  const { main, config, electron } = loadMain();
-  config.repoPath = 'C:\\HPOS';
+  const { main, setRepoPath, electron } = loadMain();
+  const fixture = makeRepoFixture();
+  setRepoPath(fixture.local);
   main.registerIpc();
 
   const info = await electron.__handlers.get('app-info')({});
 
-  assert.equal(info.repoPath, path.resolve('C:\\HPOS'));
+  assert.equal(info.repoPath, path.resolve(fixture.local));
+  assert.equal(info.ui.source, 'packaged', 'before any UI is staged the packaged renderer is reported');
   assert.equal(info.remote, 'origin');
   assert.equal(info.branch, 'main');
   assert.equal(typeof info.version, 'string');
@@ -296,16 +314,17 @@ test('the app-info IPC handler reports the configured repository', async () => {
  *  Window
  * ================================================================== */
 
-test('createWindow() builds the 520x420 fixed-size centred window', async () => {
+test('createWindow() builds a resizable, maximizable, centred dark window', async () => {
   const { main } = loadMain();
   const window = await main.createWindow();
   const o = window.options;
 
   assert.equal(o.width, 520);
   assert.equal(o.height, 420);
-  assert.equal(o.resizable, false);
+  assert.equal(o.resizable, true);
+  assert.equal(o.maximizable, true);
   assert.equal(o.center, true);
-  assert.equal(o.backgroundColor, '#0F172A');
+  assert.equal(o.backgroundColor, '#0B0D10');
   assert.equal(o.title, 'BYD');
   assert.equal(window.menuBarVisible, false, 'menu bar hidden');
   assert.equal(window.menuRemoved, true, 'menu removed');
@@ -330,6 +349,120 @@ test('launchProject() is a no-op unless config.projectLaunch is set', () => {
   const events = [];
   assert.deepEqual(main.launchProject((e) => events.push(e)), { launched: true });
   assert.ok(events.some((e) => e.type === 'state'));
+});
+
+/* ================================================================== *
+ *  Repository-provided UI: install once, then just "Pull from GitHub"
+ * ================================================================== */
+
+test('with no repository chosen the window shows the packaged renderer', async () => {
+  const { main, setRepoPath } = loadMain();
+  setRepoPath(null);
+  const window = await main.createWindow();
+  assert.equal(window.loaded, path.join(APP_DIR, 'renderer', 'index.html'));
+  assert.equal(main.getCurrentUi().source, 'packaged');
+});
+
+test('inspectRepoUi() rejects an incomplete GitHub-Updater/renderer folder', () => {
+  const { main } = loadMain();
+  const fixture = makeRepoFixture();
+  assert.equal(main.inspectRepoUi(fixture.local).ok, false, 'no renderer folder yet');
+
+  const dir = path.join(fixture.local, 'GitHub-Updater', 'renderer');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), '<html><script src="renderer.js"></script></html>');
+  const partial = main.inspectRepoUi(fixture.local);
+  assert.equal(partial.ok, false);
+  assert.match(partial.reason, /missing renderer\.js, style\.css/);
+});
+
+test('a successful pull stages the pulled renderer atomically and reloads the window into it', async () => {
+  const { main, setRepoPath, electron, userData } = loadMain();
+  const fixture = makeRepoFixture();
+  pushRendererToRemote(fixture, { css: ':root { --bg: #000000; --red: #E60012; }\n' });
+  setRepoPath(fixture.local);
+
+  main.registerIpc();
+  const window = await main.createWindow();
+  // Before the pull the clone has no GitHub-Updater/renderer -> packaged UI.
+  assert.equal(window.loaded, path.join(APP_DIR, 'renderer', 'index.html'));
+
+  const result = await electron.__handlers.get('git-pull')({ senderId: 1 });
+  assert.equal(result.ok, true, result.stderr);
+  assert.equal(result.uiReloading, true, 'the pull reply announces the UI reload');
+
+  await new Promise((r) => setTimeout(r, 900));
+
+  const ui = main.getCurrentUi();
+  assert.equal(ui.source, 'repository');
+  assert.ok(window.loaded.startsWith(path.join(userData, 'ui-cache')), 'the window loads an immutable snapshot, not the live working tree');
+  assert.equal(path.basename(window.loaded), 'index.html');
+  assert.deepEqual(window.loadedOptions, { query: { pulled: '1' } }, 'the reloaded page is told the pull succeeded');
+
+  const stagedCss = fs.readFileSync(path.join(path.dirname(window.loaded), 'style.css'), 'utf8');
+  assert.match(stagedCss, /--bg: #000000/, 'the freshly pulled style.css is what the app now shows');
+  assert.equal(fs.readdirSync(path.join(userData, 'ui-cache')).filter((n) => n.startsWith('.tmp-')).length, 0, 'no half-copied staging folders are left behind');
+});
+
+test('changing style.css on GitHub and pulling again shows the new CSS without reinstalling', async () => {
+  const { main, setRepoPath, electron } = loadMain();
+  const fixture = makeRepoFixture();
+  pushRendererToRemote(fixture, { css: 'body { background: #0B0D10; }\n' });
+  setRepoPath(fixture.local);
+  main.registerIpc();
+  const window = await main.createWindow();
+  const pull = electron.__handlers.get('git-pull');
+
+  assert.equal((await pull({})).ok, true);
+  await new Promise((r) => setTimeout(r, 900));
+  const first = main.getCurrentUi();
+  assert.equal(first.source, 'repository');
+
+  // The developer merges a UI change on GitHub...
+  pushRendererToRemote(fixture, { css: 'body { background: #000000; color: #E60012; }\n' });
+
+  // ...and the user just clicks "Pull from GitHub".
+  const second = await pull({});
+  assert.equal(second.ok, true, second.stderr);
+  assert.equal(second.uiReloading, true);
+  await new Promise((r) => setTimeout(r, 900));
+
+  const after = main.getCurrentUi();
+  assert.notEqual(after.hash, first.hash, 'a new snapshot is produced for the new content');
+  const css = fs.readFileSync(path.join(after.dir, 'style.css'), 'utf8');
+  assert.match(css, /#E60012/, 'the window now uses the CSS pulled from GitHub');
+  assert.equal(fs.existsSync(first.dir), false, 'the superseded snapshot is pruned');
+
+  // Pulling with nothing new keeps the current UI (no pointless reload).
+  const third = await pull({});
+  assert.equal(third.ok, true);
+  assert.equal(third.uiReloading, false);
+});
+
+test('a broken pulled UI falls back to the packaged renderer instead of a blank window', async () => {
+  const { main, setRepoPath } = loadMain();
+  const fixture = makeRepoFixture();
+  pushRendererToRemote(fixture);
+  setRepoPath(fixture.local);
+  require('./helpers').git(['pull', 'origin', 'main'], fixture.local);
+  fs.rmSync(path.join(fixture.local, 'GitHub-Updater', 'renderer', 'style.css'));
+
+  const messages = [];
+  const ui = main.resolveUi((m) => messages.push(m));
+  assert.equal(ui.source, 'packaged');
+  assert.ok(messages.some((m) => /built-in UI/.test(m)), 'the user is told why');
+});
+
+test('the same repository UI is reused across restarts (start-up loads the snapshot)', async () => {
+  const { main, setRepoPath, userData } = loadMain();
+  const fixture = makeRepoFixture();
+  pushRendererToRemote(fixture);
+  setRepoPath(fixture.local);
+  require('./helpers').git(['pull', 'origin', 'main'], fixture.local);
+
+  const window = await main.createWindow();
+  assert.ok(window.loaded.startsWith(path.join(userData, 'ui-cache')));
+  assert.equal(main.getCurrentUi().source, 'repository');
 });
 
 /* ================================================================== *

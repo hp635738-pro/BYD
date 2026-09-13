@@ -82,19 +82,20 @@ test('the heading matches the required copy', async () => {
   assert.equal(ui.doc.querySelector('.subtitle').textContent, 'Update local project directly from GitHub');
 });
 
-test('one card holds exactly two buttons: Pull from GitHub above Update', () => {
+test('one card holds the folder picker, then Pull from GitHub above Update', () => {
   const ui = makeRenderer();
   const cards = ui.doc.querySelectorAll('.card');
   assert.equal(cards.length, 1, 'exactly one card');
 
   const buttons = [...ui.doc.querySelectorAll('button')];
-  assert.equal(buttons.length, 2, 'exactly two buttons in the document');
-  assert.equal(buttons.filter((b) => b.closest('.card')).length, 2, 'both buttons live in the card');
+  assert.equal(buttons.length, 3, 'exactly three buttons in the document');
+  assert.equal(buttons.filter((b) => b.closest('.card')).length, 3, 'all buttons live in the card');
 
-  assert.equal(buttons[0].textContent.trim(), 'Pull from GitHub');
-  assert.equal(buttons[1].textContent.trim(), 'Update');
+  assert.equal(buttons[0].textContent.trim(), 'Choose BYD repository folder');
+  assert.equal(buttons[1].textContent.trim(), 'Pull from GitHub');
+  assert.equal(buttons[2].textContent.trim(), 'Update');
   assert.equal(
-    buttons[0].compareDocumentPosition(buttons[1]) & ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
+    buttons[1].compareDocumentPosition(buttons[2]) & ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
     ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
     'Update must come directly after Pull from GitHub'
   );
@@ -105,18 +106,18 @@ test('both buttons share the same full-card width', () => {
   const buttons = [...ui.doc.querySelectorAll('button')];
   assert.deepEqual(
     buttons.map((b) => [...b.classList].filter((c) => c.startsWith('btn-')).sort()),
-    [['btn-primary'], ['btn-success']],
-    'primary blue pull button and green update button'
+    [['btn-secondary'], ['btn-primary'], ['btn-success']],
+    'secondary picker, primary red pull button and green update button'
   );
   assert.ok(buttons.every((b) => b.classList.contains('btn')), 'both use the shared .btn class');
   assert.match(CSS, /\.btn\s*\{[^}]*width:\s*100%/s, '.btn is full width, so both buttons are equal width');
 });
 
-test('the palette matches the design spec', () => {
-  assert.match(CSS, /--bg:\s*#0f172a/i, 'background #0F172A');
-  assert.match(CSS, /--card:\s*#1e293b/i, 'card #1E293B');
-  assert.match(CSS, /--blue:\s*#3b82f6/i, 'primary button blue');
-  assert.match(CSS, /--green:\s*#22c55e/i, 'update button green');
+test('the palette matches the dark black/red design spec', () => {
+  assert.match(CSS, /--bg:\s*#0b0d10/i, 'background #0B0D10');
+  assert.match(CSS, /--card:\s*#15181d/i, 'card #15181D');
+  assert.match(CSS, /--red:\s*#e60012/i, 'primary button red');
+  assert.match(CSS, /--green:\s*#16a34a/i, 'update button green');
   assert.match(CSS, /\.card\s*\{[^}]*border-radius:\s*var\(--radius\)/s, 'rounded card');
   assert.match(CSS, /transition:[^;]*transform/s, 'smooth hover animation');
   assert.match(CSS, /\.btn:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/s, 'hover lift');
@@ -298,4 +299,49 @@ test('without the preload bridge the UI says so instead of crashing', async () =
   assert.match(text, /bridge is unavailable/i);
   assert.equal(dom.window.document.getElementById('btn-pull').disabled, true);
   assert.equal(dom.window.document.getElementById('btn-update').disabled, true);
+});
+
+/* ================================================================== *
+ *  Repository-provided UI reload (install once, pull forever)
+ * ================================================================== */
+
+test('when the pull reply announces a UI reload the page stays locked until the new UI takes over', async () => {
+  const ui = makeRenderer();
+  await flush();
+
+  ui.pull.click();
+  await ui.finishPull({ ok: true, uiReloading: true, message: 'Latest code downloaded successfully.' });
+
+  assert.equal(ui.pull.disabled, true, 'no second pull while the window is being reloaded');
+  assert.equal(ui.update.disabled, true, 'Update waits for the new page');
+  assert.match(ui.statusText.textContent, /loading the updated interface/i);
+  assert.ok(ui.statusLine.classList.contains('is-busy'));
+});
+
+test('a freshly reloaded page (?pulled=1) restores the post-pull state so Update is available', async () => {
+  const dom = new JSDOM(HTML, { runScripts: 'outside-only', url: 'http://localhost/index.html?pulled=1' });
+  const win = dom.window;
+  win.api = {
+    pull: () => new Promise(() => {}),
+    restart: () => Promise.resolve({ ok: true }),
+    getInfo: () => Promise.resolve({ version: '1.0.0', repoPath: 'C:\\BYD', remote: 'origin', branch: 'main', ui: { source: 'repository', hash: 'abc123' } }),
+    onOutput: () => () => {},
+    onState: () => () => {},
+    chooseRepository: () => Promise.resolve({ ok: false, canceled: true })
+  };
+  win.eval(RENDERER);
+  await flush();
+
+  const doc = win.document;
+  assert.equal(doc.getElementById('status-text').textContent, 'Latest code downloaded successfully.');
+  assert.ok(doc.getElementById('status-line').classList.contains('is-success'));
+  assert.equal(doc.getElementById('btn-update').disabled, false, 'Update is enabled after the reload');
+  assert.equal(doc.getElementById('btn-pull').disabled, false, 'another pull is allowed');
+  assert.match(doc.getElementById('ui-source').textContent, /from repository \(abc123\)/);
+});
+
+test('the footer says when the built-in interface is in use', async () => {
+  const ui = makeRenderer({ info: { version: '1.0.0', repoPath: '', remote: 'origin', branch: 'main', ui: { source: 'packaged', hash: '' } } });
+  await flush();
+  assert.match(ui.doc.getElementById('ui-source').textContent, /built-in v1\.0\.0/);
 });
