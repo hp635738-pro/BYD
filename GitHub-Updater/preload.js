@@ -23,6 +23,7 @@ const CHANNELS = {
   pull: 'git-pull',
   restart: 'restart-app',
   info: 'app-info',
+  choose: 'choose-repository',
   output: 'git-pull:output',
   state: 'git-pull:state'
 };
@@ -55,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
 
   /** App metadata: version, configured repo path, remote, branch. */
   getInfo: () => ipcRenderer.invoke(CHANNELS.info),
+  chooseRepository: () => ipcRenderer.invoke(CHANNELS.choose),
 
   /** Live git stdout/stderr lines: ({ type: 'stdout'|'stderr', text }). */
   onOutput: (callback) => subscribe(CHANNELS.output, callback),

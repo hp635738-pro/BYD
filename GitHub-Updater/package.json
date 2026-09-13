@@ -5,7 +5,7 @@
   "description": "Standalone Windows utility that pulls the latest code for a local repository from GitHub and relaunches the app so the new code loads.",
   "main": "main.js",
   "private": true,
-  "author": "BMD",
+  "author": "BYD",
   "license": "MIT",
   "scripts": {
     "start": "electron .",

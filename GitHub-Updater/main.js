@@ -19,7 +19,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 
 const config = require('./config');
 const pkg = require('./package.json');
@@ -56,10 +56,12 @@ let activePull = null; // guards against two pulls running at once
  * @returns {{repoPath: string, remote: string, branch: string, timeoutMs: number}}
  */
 function readConfig() {
-  const raw = config && typeof config.repoPath === 'string' ? config.repoPath.trim() : '';
-  if (!raw) {
-    throw new Error('repoPath is not set. Open config.js and set the repository path.');
-  }
+  let raw = '';
+  try {
+    const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
+    raw = typeof saved.repoPath === 'string' ? saved.repoPath.trim() : '';
+  } catch { /* first run or invalid settings */ }
+  if (!raw) throw new Error('No repository is configured. Choose the BYD repository folder first.');
 
   const remote = (config.remote || '').trim();
   const branch = (config.branch || '').trim();
@@ -86,6 +88,20 @@ function inspectRepo(repoPath) {
   const isDirectory = stats.isDirectory();
   const isGitRepo = isDirectory && fs.existsSync(path.join(repoPath, '.git'));
   return { exists: true, isDirectory, isGitRepo };
+}
+
+function remoteMatches(repoPath, remote) {
+  try {
+    const { execFileSync } = require('child_process');
+    const url = execFileSync('git', ['-C', repoPath, 'config', '--get', `remote.${remote}.url`], { encoding: 'utf8' }).trim().toLowerCase();
+    return /github\.com[/:]hp635738-pro\/byd(?:\.git)?$/.test(url);
+  } catch { return false; }
+}
+
+function saveRepoPath(repoPath) {
+  const file = path.join(app.getPath('userData'), 'settings.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ repoPath }, null, 2), 'utf8');
 }
 
 /**
@@ -220,6 +236,12 @@ function runGitPull(options = {}) {
       command: '',
       repoPath: cfg.repoPath
     });
+  }
+
+  if (!remoteMatches(cfg.repoPath, cfg.remote)) {
+    const message = `The Git remote must point to hp635738-pro/BYD (using ${cfg.remote}).`;
+    onEvent({ type: 'state', text: message }); onEvent({ type: 'done', text: '' });
+    return Promise.resolve({ ok: false, reason: 'wrong-remote', exitCode: null, stdout: '', stderr: message, message, command: '', repoPath: cfg.repoPath });
   }
 
   const invocation = buildGitInvocation(cfg);
@@ -393,8 +415,8 @@ function createWindow() {
     height: WINDOW_HEIGHT,
     minWidth: WINDOW_WIDTH,
     minHeight: WINDOW_HEIGHT,
-    resizable: false,
-    maximizable: false,
+    resizable: true,
+    maximizable: true,
     fullscreenable: false,
     center: true,
     show: false,
@@ -420,6 +442,7 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.center();
       mainWindow.show();
+      mainWindow.maximize();
       mainWindow.focus();
     }
   });
@@ -456,6 +479,17 @@ function emitToRenderer(channel, payload) {
 }
 
 function registerIpc() {
+  ipcMain.handle('choose-repository', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], title: 'Select the BYD Git repository' });
+    if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
+    const selected = path.resolve(result.filePaths[0]);
+    const info = inspectRepo(selected);
+    if (!info.isGitRepo) return { ok: false, message: 'Selected folder is not a Git repository.' };
+    if (!remoteMatches(selected, config.remote)) return { ok: false, message: 'Selected repository remote must point to hp635738-pro/BYD.' };
+    saveRepoPath(selected);
+    return { ok: true, repoPath: selected };
+  });
+
   ipcMain.handle(IPC.info, () => {
     let repoPath = '';
     try {
@@ -468,6 +502,7 @@ function registerIpc() {
       appTitle: APP_TITLE,
       repoPath,
       remote: config.remote || '',
+      expectedRepository: config.expectedRepository || '',
       branch: config.branch || '',
       platform: process.platform
     };
