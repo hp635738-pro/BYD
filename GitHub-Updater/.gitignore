@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# electron-builder output (.exe, Setup.exe, Portable.exe, unpacked/, ...)
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
