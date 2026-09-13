@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;" />
+    <title>BYD</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="heading">
+        <h1 class="title">BYD</h1>
+        <p class="subtitle">Update local project directly from GitHub</p>
+      </header>
+
+      <!-- Exactly two buttons, centred in one card. -->
+      <section class="card" aria-label="Update actions">
+        <button id="btn-pull" class="btn btn-primary" type="button">
+          <span class="btn-label">Pull from GitHub</span>
+        </button>
+
+        <button id="btn-update" class="btn btn-success" type="button" disabled>
+          <span class="btn-label">Update</span>
+        </button>
+      </section>
+
+      <section class="status" aria-live="polite">
+        <div id="status-line" class="status-line" role="status">
+          <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+          <span id="status-text" class="status-text">Ready.</span>
+        </div>
+
+        <pre id="output" class="output" hidden></pre>
+      </section>
+
+      <footer class="footer">
+        <span id="repo-path" class="repo-path" title="Repository configured in config.js"></span>
+      </footer>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
