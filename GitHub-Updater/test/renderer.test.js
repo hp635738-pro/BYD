@@ -79,17 +79,23 @@ function makeRenderer({ info = { version: '1.0.0', repoPath: 'C:\\HPOS', remote:
 test('the heading matches the required copy', async () => {
   const ui = makeRenderer();
   assert.equal(ui.doc.querySelector('.title').textContent, 'BYD');
-  assert.equal(ui.doc.querySelector('.subtitle').textContent, 'Update local project directly from GitHub');
+  assert.equal(ui.doc.querySelector('.subtitle').textContent, 'Update your project directly from GitHub');
+  assert.ok(ui.doc.querySelector('.brand-name'), 'small BYD identity above the title');
 });
 
-test('one card holds the folder picker, then Pull from GitHub above Update', () => {
+test('the repo panel holds the folder picker, then Pull from GitHub above Update', () => {
   const ui = makeRenderer();
-  const cards = ui.doc.querySelectorAll('.card');
-  assert.equal(cards.length, 1, 'exactly one card');
+  assert.equal(ui.doc.querySelectorAll('.card').length, 0, 'the heavy dashboard card is gone');
+
+  const repoPanel = ui.doc.querySelector('.repo-panel');
+  const actions = ui.doc.querySelector('.actions');
+  assert.ok(repoPanel, 'subtle glass repository section exists');
+  assert.ok(actions, 'lightweight actions stack exists');
 
   const buttons = [...ui.doc.querySelectorAll('button')];
   assert.equal(buttons.length, 3, 'exactly three buttons in the document');
-  assert.equal(buttons.filter((b) => b.closest('.card')).length, 3, 'all buttons live in the card');
+  assert.equal(buttons.filter((b) => b.closest('.repo-panel')).length, 1, 'folder picker lives in the repo panel');
+  assert.equal(buttons.filter((b) => b.closest('.actions')).length, 2, 'Pull and Update live in the actions stack');
 
   assert.equal(buttons[0].textContent.trim(), 'Choose BYD repository folder');
   assert.equal(buttons[1].textContent.trim(), 'Pull from GitHub');
@@ -99,33 +105,41 @@ test('one card holds the folder picker, then Pull from GitHub above Update', () 
     ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
     'Update must come directly after Pull from GitHub'
   );
+
+  // The selected path is shown compactly inside the repo panel.
+  const repoPath = ui.doc.getElementById('repo-path');
+  assert.ok(repoPath.closest('.repo-panel'), 'repository path lives in the repo panel');
 });
 
-test('both buttons share the same full-card width', () => {
+test('all buttons share the same full-width Apple-style control look', () => {
   const ui = makeRenderer();
   const buttons = [...ui.doc.querySelectorAll('button')];
   assert.deepEqual(
     buttons.map((b) => [...b.classList].filter((c) => c.startsWith('btn-')).sort()),
-    [['btn-secondary'], ['btn-primary'], ['btn-success']],
-    'secondary picker, primary red pull button and green update button'
+    [['btn-secondary'], ['btn-primary'], ['btn-update']],
+    'secondary picker, primary red pull button and subtle-red update button'
   );
-  assert.ok(buttons.every((b) => b.classList.contains('btn')), 'both use the shared .btn class');
-  assert.match(CSS, /\.btn\s*\{[^}]*width:\s*100%/s, '.btn is full width, so both buttons are equal width');
+  assert.ok(buttons.every((b) => b.classList.contains('btn')), 'all use the shared .btn class');
+  assert.match(CSS, /\.btn\s*\{[^}]*width:\s*100%/s, '.btn is full width, so all buttons are equal width');
 });
 
-test('the palette matches the minimal dark design spec', () => {
-  assert.match(CSS, /--bg:\s*#0f1115/i, 'background #0F1115');
-  assert.match(CSS, /--card:\s*#171a20/i, 'card #171A20');
-  assert.match(CSS, /--surface-2:\s*#1d2128/i, 'secondary surface #1D2128');
-  assert.match(CSS, /--border:\s*#2a2f38/i, 'border #2A2F38');
+test('the palette matches the Apple-inspired dark design spec', () => {
+  assert.match(CSS, /--bg:\s*#0b0c0f/i, 'background #0B0C0F');
+  assert.match(CSS, /--panel:\s*#12141a/i, 'repo panel #12141A');
   assert.match(CSS, /--red:\s*#e60012/i, 'primary button red');
   assert.match(CSS, /--red-hover:\s*#ff1a2a/i, 'hover accent #FF1A2A');
   assert.match(CSS, /--text:\s*#f5f5f5/i, 'main text #F5F5F5');
   assert.match(CSS, /--muted:\s*#9ca3af/i, 'secondary text #9CA3AF');
-  assert.match(CSS, /--green:\s*#16a34a/i, 'update button green');
-  assert.match(CSS, /\.card\s*\{[^}]*border-radius:\s*var\(--radius\)/s, 'rounded card');
+  assert.match(CSS, /--green:\s*#16a34a/i, 'restrained green status indicator');
+  assert.match(CSS, /\.repo-panel\s*\{[^}]*border-radius:\s*var\(--radius\)/s, 'rounded repo panel');
+  assert.match(CSS, /\.btn-primary\s*\{[^}]*background:\s*var\(--red\)/s, 'solid red primary button');
+  assert.match(CSS, /--red-soft:\s*rgba\(230,\s*0,\s*18/i, 'subtle red tint token');
+  assert.match(CSS, /\.btn-update\s*\{[^}]*background:\s*var\(--red-soft\)/s, 'update uses subtle red, not green');
+  assert.match(CSS, /\.btn-update:disabled\s*\{[^}]*background:\s*#15181d/i, 'update disabled is muted charcoal');
+  assert.match(CSS, /\.content\s*\{[^}]*max-width:\s*560px/s, 'compact 560px centred content');
   assert.match(CSS, /transition:[^;]*transform/s, 'smooth hover animation');
   assert.match(CSS, /\.btn:hover:not\(:disabled\)\s*\{[^}]*transform:\s*translateY\(-1px\)/s, 'hover lift');
+  assert.equal(/linear-gradient|radial-gradient/.test(CSS), false, 'no obvious gradients');
 });
 
 /* ================================================================== *

@@ -324,7 +324,7 @@ test('createWindow() builds a resizable, maximizable, centred dark window', asyn
   assert.equal(o.resizable, true);
   assert.equal(o.maximizable, true);
   assert.equal(o.center, true);
-  assert.equal(o.backgroundColor, '#0F1115');
+  assert.equal(o.backgroundColor, '#0B0C0F');
   assert.equal(o.title, 'BYD');
   assert.equal(window.menuBarVisible, false, 'menu bar hidden');
   assert.equal(window.menuRemoved, true, 'menu removed');

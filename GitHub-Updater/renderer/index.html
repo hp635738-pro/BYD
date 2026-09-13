@@ -9,36 +9,49 @@
   </head>
   <body>
     <main class="shell">
-      <header class="heading">
-        <h1 class="title">BYD</h1>
-        <p class="subtitle">Update local project directly from GitHub</p>
-      </header>
+      <div class="content">
+        <header class="heading">
+          <div class="brand">
+            <span class="brand-dot" aria-hidden="true"></span>
+            <span class="brand-name">BYD</span>
+          </div>
+          <h1 class="title">BYD</h1>
+          <p class="subtitle">Update your project directly from GitHub</p>
+        </header>
 
-      <!-- Primary actions — centred in one card. -->
-      <section class="card" aria-label="Update actions">
-        <button id="btn-select" class="btn btn-secondary" type="button">Choose BYD repository folder</button>
-        <button id="btn-pull" class="btn btn-primary" type="button">
-          <span class="btn-label">Pull from GitHub</span>
-        </button>
+        <!-- Repository picker — subtle glass surface, not a heavy card. -->
+        <section class="repo-panel" aria-label="Repository">
+          <div class="repo-meta">
+            <span class="repo-label">Repository</span>
+            <span id="repo-path" class="repo-path" title="Selected BYD repository"></span>
+          </div>
+          <button id="btn-select" class="btn btn-secondary" type="button">Choose BYD repository folder</button>
+        </section>
 
-        <button id="btn-update" class="btn btn-success" type="button" disabled>
-          <span class="btn-label">Update</span>
-        </button>
-      </section>
+        <!-- Primary actions — lightweight vertical stack, no surrounding panel. -->
+        <section class="actions" aria-label="Update actions">
+          <button id="btn-pull" class="btn btn-primary" type="button">
+            <span class="btn-label">Pull from GitHub</span>
+          </button>
 
-      <section class="status" aria-live="polite">
-        <div id="status-line" class="status-line" role="status">
-          <span id="status-dot" class="status-dot" aria-hidden="true"></span>
-          <span id="status-text" class="status-text">Ready.</span>
-        </div>
+          <button id="btn-update" class="btn btn-update" type="button" disabled>
+            <span class="btn-label">Update</span>
+          </button>
+        </section>
 
-        <pre id="output" class="output" hidden></pre>
-      </section>
+        <section class="status" aria-live="polite">
+          <div id="status-line" class="status-line" role="status">
+            <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+            <span id="status-text" class="status-text">Ready.</span>
+          </div>
 
-      <footer class="footer">
-        <span id="repo-path" class="repo-path" title="Selected BYD repository"></span>
-        <span id="ui-source" class="ui-source" title="Where the interface files currently shown were loaded from"></span>
-      </footer>
+          <pre id="output" class="output" hidden></pre>
+        </section>
+
+        <footer class="footer">
+          <span id="ui-source" class="ui-source" title="Where the interface files currently shown were loaded from"></span>
+        </footer>
+      </div>
     </main>
 
     <script src="renderer.js"></script>
