@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- *  GitHub Updater — renderer
+ *  BYD — renderer
  * ============================================================================
  *  Vanilla JS only. Talks to the main process exclusively through the
  *  `window.api` bridge exposed by preload.js.

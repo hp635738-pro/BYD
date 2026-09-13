@@ -86,7 +86,7 @@ function makeElectronStub() {
     setName: (name) => {
       calls.name = name;
     },
-    getName: () => 'GitHub Updater',
+    getName: () => 'BYD',
     relaunch: (args) => {
       calls.relaunch += 1;
       calls.relaunchArgs = args;

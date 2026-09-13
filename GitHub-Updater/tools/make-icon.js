@@ -4,25 +4,34 @@
  * ============================================================================
  *  tools/make-icon.js — regenerates assets/icon.ico (and assets/icon.png)
  * ============================================================================
- *  Zero-dependency icon generator: it rasterises the GitHub Updater glyph
- *  (a blue "pull" arrow landing on a green project bar) with 4x4
- *  supersampling and encodes real PNG + multi-size ICO files itself, so the
- *  icon is reproducible with just Node.
+ *  Two sources, in order of preference:
+ *
+ *   1. Brand logo   — if assets/logo.png exists AND ImageMagick (`convert`) is
+ *      on the PATH, the BYD wordmark is re-tinted to silver and placed on the
+ *      dark rounded card, then packed into a multi-size PNG-based ICO.
+ *
+ *   2. Built-in glyph — a zero-dependency rasteriser (blue pull-arrow onto a
+ *      green bar) used only when no logo is present, so the icon can always be
+ *      regenerated with just Node.
+ *
+ *  If assets/logo.png exists but ImageMagick is NOT installed, the existing
+ *  committed icon.ico is left untouched (a warning is printed) so a bare
+ *  `npm run icon` can never destroy the brand icon.
  *
  *      npm run icon
- *
- *  The ICO embeds 16/24/32/48/64/128/256 px entries (PNG-compressed), which is
- *  what electron-builder needs — it requires an .ico of at least 256x256.
  * ============================================================================
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
+const { execFileSync, spawnSync } = require('child_process');
 
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
-const SAMPLES = 4; // 4x4 supersampling per pixel
+const SAMPLES = 4; // 4x4 supersampling per pixel (glyph fallback only)
 const OUT_DIR = path.join(__dirname, '..', 'assets');
+const LOGO_PATH = path.join(OUT_DIR, 'logo.png');
 
 /* ----------------------------- colour helpers ---------------------------- */
 
@@ -32,11 +41,7 @@ function hex(value) {
 }
 
 function mix(a, b, t) {
-  return [
-    a[0] + (b[0] - a[0]) * t,
-    a[1] + (b[1] - a[1]) * t,
-    a[2] + (b[2] - a[2]) * t
-  ];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
 const C = {
@@ -49,118 +54,7 @@ const C = {
   barBottom: hex('#16a34a')
 };
 
-/* --------------------------- shape primitives ---------------------------- */
-
-/** Signed distance to a rounded box centred at (cx, cy). */
-function sdRoundBox(px, py, cx, cy, halfW, halfH, radius) {
-  const qx = Math.abs(px - cx) - halfW + radius;
-  const qy = Math.abs(py - cy) - halfH + radius;
-  const ax = Math.max(qx, 0);
-  const ay = Math.max(qy, 0);
-  return Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - radius;
-}
-
-/** Point-in-triangle (barycentric signs). */
-function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
-  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
-  const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
-  const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
-  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
-  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
-  return !(hasNeg && hasPos);
-}
-
-/* ------------------------------ the artwork ------------------------------ */
-/*  Coordinate space: x/y in [-1, 1], y grows downwards, (0,0) = centre.     */
-
-const GY = -0.13; // vertical centring offset for the glyph
-
-function drawPixel(x, y, size) {
-  const detailed = size >= 48;
-
-  // --- background: rim + inner panel -------------------------------------
-  const rimHalf = 0.9;
-  const rimRadius = 0.26;
-  const innerHalf = detailed ? 0.865 : 0.9;
-  const innerRadius = 0.235;
-
-  if (sdRoundBox(x, y, 0, 0, rimHalf, rimHalf, rimRadius) > 0) return null;
-
-  const t = (y + 1) / 2; // 0 at the top, 1 at the bottom
-  const inner = sdRoundBox(x, y, 0, 0, innerHalf, innerHalf, innerRadius);
-  let rgb = inner < 0 ? mix(C.bgTop, C.bgBottom, t) : C.rim;
-
-  // --- glyph geometry -----------------------------------------------------
-  const shaftHalf = detailed ? 0.105 : 0.135;
-  const shaftTop = -0.5 + GY;
-  const shaftBottom = 0.02 + GY;
-  const headBaseY = -0.06 + GY;
-  const headApexY = 0.33 + GY;
-  const headHalf = detailed ? 0.33 : 0.38;
-  const barHalf = 0.42;
-  const barTop = 0.47 + GY;
-  const barBottom = 0.62 + GY;
-
-  const inShaft = Math.abs(x) <= shaftHalf && y >= shaftTop && y <= shaftBottom;
-  const inHead = inTriangle(x, y, 0, headApexY, -headHalf, headBaseY, headHalf, headBaseY);
-  const inBar = sdRoundBox(x, y, 0, (barTop + barBottom) / 2, barHalf, (barBottom - barTop) / 2, 0.07) <= 0;
-
-  const glyphT = (y - (shaftTop)) / (headApexY - shaftTop);
-
-  if (inShaft || inHead) {
-    rgb = mix(C.arrowTop, C.arrowBottom, Math.min(Math.max(glyphT, 0), 1));
-  } else if (inBar) {
-    const barT = (x + barHalf) / (2 * barHalf);
-    rgb = mix(C.barTop, C.barBottom, barT * 0.75 + 0.15);
-  }
-
-  return rgb;
-}
-
-/** Rasterise one size into an RGBA buffer (size*size*4). */
-function rasterise(size) {
-  const data = Buffer.alloc(size * size * 4);
-  const step = 1 / size;
-  const sub = 1 / SAMPLES;
-
-  for (let py = 0; py < size; py++) {
-    for (let px = 0; px < size; px++) {
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let hits = 0;
-
-      for (let sy = 0; sy < SAMPLES; sy++) {
-        for (let sx = 0; sx < SAMPLES; sx++) {
-          // Sample centre, mapped to [-1, 1].
-          const x = (px + (sx + 0.5) * sub) * step * 2 - 1;
-          const y = (py + (sy + 0.5) * sub) * step * 2 - 1;
-          const rgb = drawPixel(x, y, size);
-          if (rgb) {
-            r += rgb[0];
-            g += rgb[1];
-            b += rgb[2];
-            hits += 1;
-          }
-        }
-      }
-
-      const total = SAMPLES * SAMPLES;
-      const idx = (py * size + px) * 4;
-      const alpha = Math.round((hits / total) * 255);
-      if (alpha > 0) {
-        data[idx] = Math.round(r / hits);
-        data[idx + 1] = Math.round(g / hits);
-        data[idx + 2] = Math.round(b / hits);
-      }
-      data[idx + 3] = alpha;
-    }
-  }
-
-  return data;
-}
-
-/* ------------------------------ PNG encoder ------------------------------ */
+/* ===============================  ICO / PNG  =============================== */
 
 const CRC_TABLE = (() => {
   const table = new Int32Array(256);
@@ -194,16 +88,11 @@ function encodePng(width, height, rgba) {
     raw[y * (stride + 1)] = 0; // filter: none
     rgba.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
   }
-
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // colour type: RGBA
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
+  ihdr[8] = 8;
+  ihdr[9] = 6; // RGBA
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     pngChunk('IHDR', ihdr),
@@ -212,20 +101,19 @@ function encodePng(width, height, rgba) {
   ]);
 }
 
-/* ------------------------------ ICO encoder ------------------------------ */
-
+/** Pack already-encoded PNG buffers into a single multi-size ICO. */
 function encodeIco(pngsBySize) {
   const entries = [];
   let offset = 6 + 16 * pngsBySize.length;
 
   for (const { size, png } of pngsBySize) {
     const entry = Buffer.alloc(16);
-    entry[0] = size >= 256 ? 0 : size; // 0 means 256
+    entry[0] = size >= 256 ? 0 : size;
     entry[1] = size >= 256 ? 0 : size;
     entry[2] = 0;
     entry[3] = 0;
-    entry.writeUInt16LE(1, 4); // planes
-    entry.writeUInt16LE(32, 6); // bit count
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
     entry.writeUInt32LE(png.length, 8);
     entry.writeUInt32LE(offset, 12);
     offset += png.length;
@@ -233,11 +121,165 @@ function encodeIco(pngsBySize) {
   }
 
   const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0); // reserved
-  header.writeUInt16LE(1, 2); // type: icon
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
   header.writeUInt16LE(pngsBySize.length, 4);
 
   return Buffer.concat([header, ...entries, ...pngsBySize.map((e) => e.png)]);
+}
+
+/* ========================  Source 1: brand logo  ========================== */
+
+function hasConvert() {
+  try {
+    const r = spawnSync('convert', ['-version'], { encoding: 'utf8' });
+    return r.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function runConvert(args) {
+  execFileSync('convert', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/** Build the master 256px icon from assets/logo.png using ImageMagick. */
+function buildMasterFromLogo(logoPath, masterPath, tmp) {
+  const mask = path.join(tmp, 'mask.png');
+  const fill = path.join(tmp, 'fill.png');
+  const logoLight = path.join(tmp, 'logo_light.png');
+  const rim = path.join(tmp, 'rim.png');
+  const grad = path.join(tmp, 'grad.png');
+  const cardMask = path.join(tmp, 'cardmask.png');
+  const card = path.join(tmp, 'card.png');
+  const cardRimmed = path.join(tmp, 'card_rimmed.png');
+  const logoS = path.join(tmp, 'logo_s.png');
+
+  // Re-tint the (dark) wordmark to a light silver gradient using its alpha.
+  runConvert([logoPath, '-alpha', 'extract', mask]);
+  runConvert(['-size', '500x500', 'gradient:#f8fafc-#8ea3bd', fill]);
+  runConvert([fill, mask, '-compose', 'copyopacity', '-composite', logoLight]);
+
+  // Dark rounded card with a blue rim.
+  runConvert(['-size', '256x256', 'xc:none', '-fill', '#3b6ea5', '-draw', 'roundrectangle 2,2 253,253 58,58', rim]);
+  runConvert(['-size', '256x256', 'gradient:#24344f-#0d1526', grad]);
+  runConvert(['-size', '256x256', 'xc:none', '-fill', 'white', '-draw', 'roundrectangle 7,7 248,248 52,52', cardMask]);
+  runConvert([grad, cardMask, '-compose', 'copyopacity', '-composite', card]);
+  runConvert([rim, card, '-compose', 'over', '-composite', cardRimmed]);
+
+  runConvert([logoLight, '-resize', '186x', logoS]);
+  runConvert([cardRimmed, logoS, '-gravity', 'center', '-compose', 'over', '-composite', masterPath]);
+}
+
+function buildFromLogo() {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'byd-icon-'));
+  const masterPath = path.join(tmp, 'master.png');
+  buildMasterFromLogo(LOGO_PATH, masterPath, tmp);
+
+  const pngsBySize = SIZES.map((size) => {
+    const sized = path.join(tmp, `s${size}.png`);
+    runConvert([masterPath, '-resize', `${size}x${size}`, sized]);
+    return { size, png: fs.readFileSync(sized) };
+  });
+
+  fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), encodeIco(pngsBySize));
+  fs.copyFileSync(masterPath, path.join(OUT_DIR, 'icon.png'));
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log(`Wrote assets/icon.ico from logo.png (PNG, ${SIZES.join('/')} px)`);
+}
+
+/* ===================  Source 2: built-in glyph (fallback)  ================ */
+
+function sdRoundBox(px, py, cx, cy, halfW, halfH, radius) {
+  const qx = Math.abs(px - cx) - halfW + radius;
+  const qy = Math.abs(py - cy) - halfH + radius;
+  const ax = Math.max(qx, 0);
+  const ay = Math.max(qy, 0);
+  return Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - radius;
+}
+
+function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
+  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+  const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+  const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+}
+
+const GY = -0.13;
+
+function drawPixel(x, y, size) {
+  const detailed = size >= 48;
+  const rimHalf = 0.9;
+  const rimRadius = 0.26;
+  const innerHalf = detailed ? 0.865 : 0.9;
+  const innerRadius = 0.235;
+
+  if (sdRoundBox(x, y, 0, 0, rimHalf, rimHalf, rimRadius) > 0) return null;
+
+  const t = (y + 1) / 2;
+  const inner = sdRoundBox(x, y, 0, 0, innerHalf, innerHalf, innerRadius);
+  let rgb = inner < 0 ? mix(C.bgTop, C.bgBottom, t) : C.rim;
+
+  const shaftHalf = detailed ? 0.105 : 0.135;
+  const shaftTop = -0.5 + GY;
+  const shaftBottom = 0.02 + GY;
+  const headBaseY = -0.06 + GY;
+  const headApexY = 0.33 + GY;
+  const headHalf = detailed ? 0.33 : 0.38;
+  const barHalf = 0.42;
+  const barTop = 0.47 + GY;
+  const barBottom = 0.62 + GY;
+
+  const inShaft = Math.abs(x) <= shaftHalf && y >= shaftTop && y <= shaftBottom;
+  const inHead = inTriangle(x, y, 0, headApexY, -headHalf, headBaseY, headHalf, headBaseY);
+  const inBar = sdRoundBox(x, y, 0, (barTop + barBottom) / 2, barHalf, (barBottom - barTop) / 2, 0.07) <= 0;
+
+  const glyphT = (y - shaftTop) / (headApexY - shaftTop);
+
+  if (inShaft || inHead) rgb = mix(C.arrowTop, C.arrowBottom, Math.min(Math.max(glyphT, 0), 1));
+  else if (inBar) {
+    const barT = (x + barHalf) / (2 * barHalf);
+    rgb = mix(C.barTop, C.barBottom, barT * 0.75 + 0.15);
+  }
+
+  return rgb;
+}
+
+function rasterise(size) {
+  const data = Buffer.alloc(size * size * 4);
+  const step = 1 / size;
+  const sub = 1 / SAMPLES;
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      let r = 0, g = 0, b = 0, hits = 0;
+      for (let sy = 0; sy < SAMPLES; sy++) {
+        for (let sx = 0; sx < SAMPLES; sx++) {
+          const x = (px + (sx + 0.5) * sub) * step * 2 - 1;
+          const y = (py + (sy + 0.5) * sub) * step * 2 - 1;
+          const rgb = drawPixel(x, y, size);
+          if (rgb) { r += rgb[0]; g += rgb[1]; b += rgb[2]; hits += 1; }
+        }
+      }
+      const idx = (py * size + px) * 4;
+      const alpha = Math.round((hits / (SAMPLES * SAMPLES)) * 255);
+      if (alpha > 0) {
+        data[idx] = Math.round(r / hits);
+        data[idx + 1] = Math.round(g / hits);
+        data[idx + 2] = Math.round(b / hits);
+      }
+      data[idx + 3] = alpha;
+    }
+  }
+  return data;
+}
+
+function buildGlyph() {
+  const pngsBySize = SIZES.map((size) => ({ size, png: encodePng(size, size, rasterise(size)) }));
+  fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), encodeIco(pngsBySize));
+  fs.writeFileSync(path.join(OUT_DIR, 'icon.png'), pngsBySize[pngsBySize.length - 1].png);
+  console.log(`Wrote assets/icon.ico from built-in glyph (PNG, ${SIZES.join('/')} px)`);
 }
 
 /* --------------------------------- main ---------------------------------- */
@@ -245,18 +287,19 @@ function encodeIco(pngsBySize) {
 function build() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
-  const pngsBySize = SIZES.map((size) => ({ size, png: encodePng(size, size, rasterise(size)) }));
+  if (fs.existsSync(LOGO_PATH)) {
+    if (hasConvert()) {
+      buildFromLogo();
+    } else {
+      console.warn('assets/logo.png found but ImageMagick "convert" is not on PATH.');
+      console.warn('Leaving the committed icon.ico untouched. Install ImageMagick to regenerate from the logo.');
+    }
+    return;
+  }
 
-  const icoPath = path.join(OUT_DIR, 'icon.ico');
-  const pngPath = path.join(OUT_DIR, 'icon.png');
-  fs.writeFileSync(icoPath, encodeIco(pngsBySize));
-  fs.writeFileSync(pngPath, pngsBySize[pngsBySize.length - 1].png);
-
-  const icoSize = fs.statSync(icoPath).size;
-  console.log(`Wrote ${path.relative(process.cwd(), icoPath)} (${icoSize} bytes, ${SIZES.join('/')} px)`);
-  console.log(`Wrote ${path.relative(process.cwd(), pngPath)}`);
+  buildGlyph();
 }
 
 if (require.main === module) build();
 
-module.exports = { build, encodeIco, encodePng, rasterise, SIZES, OUT_DIR };
+module.exports = { build, buildFromLogo, buildGlyph, encodeIco, encodePng, rasterise, SIZES, OUT_DIR, LOGO_PATH };

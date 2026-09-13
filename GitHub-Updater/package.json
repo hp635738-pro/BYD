@@ -1,6 +1,6 @@
 {
-  "name": "github-updater",
-  "productName": "GitHub Updater",
+  "name": "byd-updater",
+  "productName": "BYD",
   "version": "1.0.0",
   "description": "Standalone Windows utility that pulls the latest code for a local repository from GitHub and relaunches the app so the new code loads.",
   "main": "main.js",
@@ -22,8 +22,8 @@
     "jsdom": "^27.0.0"
   },
   "build": {
-    "appId": "com.bmd.githubupdater",
-    "productName": "GitHub Updater",
+    "appId": "com.byd.updater",
+    "productName": "BYD",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "dist",
@@ -64,7 +64,7 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GitHub Updater",
+      "shortcutName": "BYD",
       "deleteAppDataOnUninstall": false
     },
     "portable": {

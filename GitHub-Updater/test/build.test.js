@@ -67,8 +67,8 @@ test('the project ships the required structure', () => {
 
 test('package.json is a valid Electron app manifest', () => {
   assert.equal(pkg.main, 'main.js');
-  assert.equal(pkg.name, 'github-updater');
-  assert.equal(pkg.productName, 'GitHub Updater');
+  assert.equal(pkg.name, 'byd-updater');
+  assert.equal(pkg.productName, 'BYD');
   assert.ok(exists(pkg.main));
   assert.equal(pkg.scripts.start, 'electron .');
   assert.equal(pkg.scripts.build, 'electron-builder --win');
@@ -79,8 +79,8 @@ test('package.json is a valid Electron app manifest', () => {
 
 test('the electron-builder config targets Windows and packages every runtime file', () => {
   const build = pkg.build;
-  assert.equal(build.appId, 'com.bmd.githubupdater');
-  assert.equal(build.productName, 'GitHub Updater');
+  assert.equal(build.appId, 'com.byd.updater');
+  assert.equal(build.productName, 'BYD');
   assert.equal(build.asar, true);
 
   const targets = build.win.target.map((t) => t.target);

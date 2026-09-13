@@ -1,12 +1,13 @@
-# GitHub Updater
+# BYD — GitHub Updater
 
-A standalone **Windows Electron** utility, built on its own — separate from the main project.
-It pulls the latest code for a local repository straight from GitHub and then relaunches the
-application so the freshly pulled code loads.
+A standalone **Windows Electron** utility (app name **BYD**), built on its own — separate from
+the main project. It pulls the latest code for a local repository straight from GitHub and
+then relaunches the application so the freshly pulled code loads. The app icon is the BYD
+logo (`assets/logo.png` → `assets/icon.ico`).
 
 ```
 ┌───────────────────────────────────────────────┐
-│                 GitHub Updater                │
+│                     BYD                       │
 │        Update local project directly          │
 │              from GitHub                      │
 │   ┌───────────────────────────────────────┐   │
@@ -42,12 +43,13 @@ GitHub-Updater/
 │   └── renderer.js       button logic, live status, output console
 │
 ├── assets/
-│   ├── icon.ico          multi-size (16-256 px) Windows icon
+│   ├── logo.png          BYD brand wordmark (icon source)
+│   ├── icon.ico          multi-size (16-256 px) Windows icon built from logo.png
 │   └── icon.png          256 px reference render
 │
 ├── build/                electron-builder buildResources (see build/README.md)
 ├── tools/
-│   ├── make-icon.js      regenerates assets/icon.ico (no ImageMagick needed)
+│   ├── make-icon.js      regenerates assets/icon.ico from logo.png (ImageMagick), glyph fallback
 │   └── verify-package.js asserts the payload that ships inside the .exe
 └── test/                 55 automated tests (node:test + jsdom)
 ```
@@ -60,26 +62,64 @@ GitHub-Updater/
 cd GitHub-Updater
 npm install
 npm start          # run from source (needs the repoPath below to exist)
-npm run build      # -> dist\GitHub Updater-1.0.0-Setup.exe  (+ Portable.exe)
+npm run build      # -> dist\BYD-1.0.0-Setup.exe  (+ BYD-1.0.0-Portable.exe)
 ```
 
 `npm run build` produces two artifacts in `dist/`:
 
 | Artifact | What it is |
 | --- | --- |
-| `GitHub Updater-1.0.0-Setup.exe` | NSIS installer (desktop + start-menu shortcuts, choose install dir) |
-| `GitHub Updater-1.0.0-Portable.exe` | **single self-contained .exe** — run it from anywhere, nothing installed |
+| `BYD-1.0.0-Setup.exe` | NSIS installer (desktop + start-menu shortcuts, choose install dir) |
+| `BYD-1.0.0-Portable.exe` | **single self-contained .exe** — run it from anywhere, nothing installed |
 
-Both embed the app in `app.asar` and carry `assets/icon.ico` as the executable icon.
+Both embed the app in `app.asar` and carry the BYD `assets/icon.ico` as the executable icon.
 
 Other commands:
 
 ```bash
 npm test               # 55 tests: main process, preload bridge, renderer UI, packaging
 npm run verify:package # build app.asar and assert exactly what ships inside the .exe
-npm run icon           # regenerate assets/icon.ico
+npm run icon           # regenerate assets/icon.ico from assets/logo.png (ImageMagick)
 npm run pack           # unpacked build only (dist/win-unpacked), no installer
 ```
+
+---
+
+## How to set up the .exe (step by step)
+
+**Prerequisites (one time):** install [Node.js LTS](https://nodejs.org) (18+) and
+[Git for Windows](https://git-scm.com/download/win). Verify with `node -v`, `npm -v`, `git --version`.
+
+**A. Build the .exe**
+
+1. Open a terminal in the `GitHub-Updater` folder.
+2. `npm install`
+3. Edit `config.js` → set `repoPath` to the project folder this updater manages
+   (e.g. `C:\\HPOS`). **Do this before building** — the path is baked into the .exe.
+4. `npm run build`
+5. Find the outputs in `dist\`:
+   `BYD-1.0.0-Setup.exe` (installer) and `BYD-1.0.0-Portable.exe` (single file).
+
+**B. Install / run it**
+
+*Option 1 — Portable (simplest):* copy `BYD-1.0.0-Portable.exe` anywhere (desktop, USB) and
+double-click. Nothing is installed; it just runs.
+
+*Option 2 — Installer:* double-click `BYD-1.0.0-Setup.exe`, choose the install folder, finish.
+It creates a desktop + start-menu shortcut named **BYD**. Launch from the shortcut.
+
+**C. Use it**
+
+1. Open the app → click **Pull from GitHub** (live git output appears; button locks while running).
+2. On success you see the green `Latest code downloaded successfully.` and **Update** unlocks.
+3. Click **Update** → the app relaunches and the newly pulled code loads.
+
+**Notes**
+
+* The .exe is unsigned, so Windows SmartScreen may say "Unknown publisher".
+  Click **More info → Run anyway**. (Sign it later by adding `win.certificateFile` in package.json.)
+* If `git pull` needs a private-repo login, run `git pull` once in a normal terminal first so the
+  credential is cached, then the updater can pull without prompts.
 
 ---
 
@@ -183,7 +223,7 @@ Hardening: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, 
 * Electron-builder 26 stamps the icon and version info with the pure-JS `resedit` package,
   so **no wine is needed for the icon/metadata step**.
 * The app has **zero runtime dependencies** — `dependencies` is empty; everything else is a
-  devDependency, so `app.asar` stays ~55 KB.
+  devDependency, so `app.asar` stays ~77 KB (app code + BYD logo icon).
 
 ### Troubleshooting
 

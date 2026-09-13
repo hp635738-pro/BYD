@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- *  GitHub Updater — configuration
+ *  BYD — configuration
  * ============================================================================
  *
  *  This is the ONLY file in the whole project that contains filesystem paths.

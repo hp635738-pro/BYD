@@ -78,7 +78,7 @@ function makeRenderer({ info = { version: '1.0.0', repoPath: 'C:\\HPOS', remote:
 
 test('the heading matches the required copy', async () => {
   const ui = makeRenderer();
-  assert.equal(ui.doc.querySelector('.title').textContent, 'GitHub Updater');
+  assert.equal(ui.doc.querySelector('.title').textContent, 'BYD');
   assert.equal(ui.doc.querySelector('.subtitle').textContent, 'Update local project directly from GitHub');
 });
 

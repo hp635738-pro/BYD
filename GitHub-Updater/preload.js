@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- *  GitHub Updater — preload
+ *  BYD — preload
  * ============================================================================
  *  Runs in an isolated context with `contextIsolation: true` and
  *  `nodeIntegration: false`, so the renderer only ever sees the tiny,

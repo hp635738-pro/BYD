@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- *  GitHub Updater — main (Electron) process
+ *  BYD — main (Electron) process
  * ============================================================================
  *  Responsibilities:
  *    - createWindow()                  -> the single 520x420 dark window
@@ -30,7 +30,7 @@ const pkg = require('./package.json');
 const WINDOW_WIDTH = 520;
 const WINDOW_HEIGHT = 420;
 const BACKGROUND_COLOR = '#0F172A';
-const APP_TITLE = 'GitHub Updater';
+const APP_TITLE = 'BYD';
 const RELAUNCH_DELAY_MS = 150; // let the IPC reply reach the renderer first
 
 /** IPC channel names — preload.js mirrors these. */
@@ -429,7 +429,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html')).catch((err) => {
-    console.error('GitHub Updater: failed to load the UI —', err);
+    console.error('BYD: failed to load the UI —', err);
   });
 
   return mainWindow;

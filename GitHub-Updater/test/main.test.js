@@ -306,7 +306,7 @@ test('createWindow() builds the 520x420 fixed-size centred window', async () => 
   assert.equal(o.resizable, false);
   assert.equal(o.center, true);
   assert.equal(o.backgroundColor, '#0F172A');
-  assert.equal(o.title, 'GitHub Updater');
+  assert.equal(o.title, 'BYD');
   assert.equal(window.menuBarVisible, false, 'menu bar hidden');
   assert.equal(window.menuRemoved, true, 'menu removed');
   assert.ok(o.webPreferences.preload.endsWith('preload.js'));

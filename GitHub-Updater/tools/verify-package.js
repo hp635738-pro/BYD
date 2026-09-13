@@ -99,7 +99,7 @@ async function main() {
 
   const packedPkg = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   if (packedPkg.main !== 'main.js') failures.push('packed package.json main is not main.js');
-  if (packedPkg.name !== 'github-updater') failures.push('packed package.json name is wrong');
+  if (packedPkg.name !== 'byd-updater') failures.push('packed package.json name is wrong');
 
   const size = fs.statSync(archive).size;
   console.log(`\napp.asar size: ${size} bytes`);
