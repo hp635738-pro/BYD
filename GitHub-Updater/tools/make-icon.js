@@ -2,20 +2,25 @@
 
 /**
  * ============================================================================
- *  tools/make-icon.js — regenerates assets/icon.ico (and assets/icon.png)
+ *  tools/make-icon.js — regenerates assets/icon.png (Linux app icon)
  * ============================================================================
+ *  Ubuntu/AppImage builds use a PNG icon: `build.linux.icon` points at
+ *  assets/icon.png and electron-builder derives every hicolor size it needs
+ *  (16…512 px) from it, for both the AppImage and the .deb. The old
+ *  multi-size Windows .ico is gone — nothing in the project consumes it.
+ *
  *  Two sources, in order of preference:
  *
  *   1. Brand logo   — if assets/logo.png exists AND ImageMagick (`convert`) is
  *      on the PATH, the BYD wordmark is re-tinted to silver and placed on the
- *      dark rounded card, then packed into a multi-size PNG-based ICO.
+ *      dark rounded card, then written as a 512x512 PNG.
  *
  *   2. Built-in glyph — a zero-dependency rasteriser (blue pull-arrow onto a
  *      green bar) used only when no logo is present, so the icon can always be
  *      regenerated with just Node.
  *
  *  If assets/logo.png exists but ImageMagick is NOT installed, the existing
- *  committed icon.ico is left untouched (a warning is printed) so a bare
+ *  committed icon.png is left untouched (a warning is printed) so a bare
  *  `npm run icon` can never destroy the brand icon.
  *
  *      npm run icon
@@ -28,10 +33,12 @@ const path = require('path');
 const zlib = require('zlib');
 const { execFileSync, spawnSync } = require('child_process');
 
-const SIZES = [16, 24, 32, 48, 64, 128, 256];
+/** electron-builder needs >= 256x256; 512 keeps HiDPI Ubuntu desktops crisp. */
+const MASTER_SIZE = 512;
 const SAMPLES = 4; // 4x4 supersampling per pixel (glyph fallback only)
 const OUT_DIR = path.join(__dirname, '..', 'assets');
 const LOGO_PATH = path.join(OUT_DIR, 'logo.png');
+const ICON_PATH = path.join(OUT_DIR, 'icon.png');
 
 /* ----------------------------- colour helpers ---------------------------- */
 
@@ -54,7 +61,7 @@ const C = {
   barBottom: hex('#16a34a')
 };
 
-/* ===============================  ICO / PNG  =============================== */
+/* ==============================  PNG encoder  ============================== */
 
 const CRC_TABLE = (() => {
   const table = new Int32Array(256);
@@ -101,31 +108,16 @@ function encodePng(width, height, rgba) {
   ]);
 }
 
-/** Pack already-encoded PNG buffers into a single multi-size ICO. */
-function encodeIco(pngsBySize) {
-  const entries = [];
-  let offset = 6 + 16 * pngsBySize.length;
-
-  for (const { size, png } of pngsBySize) {
-    const entry = Buffer.alloc(16);
-    entry[0] = size >= 256 ? 0 : size;
-    entry[1] = size >= 256 ? 0 : size;
-    entry[2] = 0;
-    entry[3] = 0;
-    entry.writeUInt16LE(1, 4);
-    entry.writeUInt16LE(32, 6);
-    entry.writeUInt32LE(png.length, 8);
-    entry.writeUInt32LE(offset, 12);
-    offset += png.length;
-    entries.push(entry);
+/** Read width/height out of a PNG's IHDR chunk. */
+function pngSize(file) {
+  const head = Buffer.alloc(24);
+  const fd = fs.openSync(file, 'r');
+  try {
+    fs.readSync(fd, head, 0, 24, 0);
+  } finally {
+    fs.closeSync(fd);
   }
-
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(pngsBySize.length, 4);
-
-  return Buffer.concat([header, ...entries, ...pngsBySize.map((e) => e.png)]);
+  return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
 }
 
 /* ========================  Source 1: brand logo  ========================== */
@@ -143,8 +135,9 @@ function runConvert(args) {
   execFileSync('convert', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-/** Build the master 256px icon from assets/logo.png using ImageMagick. */
-function buildMasterFromLogo(logoPath, masterPath, tmp) {
+/** Build the master PNG from assets/logo.png using ImageMagick. */
+function buildMasterFromLogo(logoPath, masterPath, tmp, size = MASTER_SIZE) {
+  const s = (n) => String(Math.round((n * size) / 256));
   const mask = path.join(tmp, 'mask.png');
   const fill = path.join(tmp, 'fill.png');
   const logoLight = path.join(tmp, 'logo_light.png');
@@ -157,35 +150,34 @@ function buildMasterFromLogo(logoPath, masterPath, tmp) {
 
   // Re-tint the (dark) wordmark to a light silver gradient using its alpha.
   runConvert([logoPath, '-alpha', 'extract', mask]);
-  runConvert(['-size', '500x500', 'gradient:#f8fafc-#8ea3bd', fill]);
+  runConvert(['-size', `${size}x${size}`, 'gradient:#f8fafc-#8ea3bd', fill]);
   runConvert([fill, mask, '-compose', 'copyopacity', '-composite', logoLight]);
 
   // Dark rounded card with a blue rim.
-  runConvert(['-size', '256x256', 'xc:none', '-fill', '#3b6ea5', '-draw', 'roundrectangle 2,2 253,253 58,58', rim]);
-  runConvert(['-size', '256x256', 'gradient:#24344f-#0d1526', grad]);
-  runConvert(['-size', '256x256', 'xc:none', '-fill', 'white', '-draw', 'roundrectangle 7,7 248,248 52,52', cardMask]);
+  runConvert([
+    '-size', `${size}x${size}`, 'xc:none', '-fill', '#3b6ea5',
+    '-draw', `roundrectangle ${s(2)},${s(2)} ${size - s(3)},${size - s(3)} ${s(58)},${s(58)}`, rim
+  ]);
+  runConvert(['-size', `${size}x${size}`, 'gradient:#24344f-#0d1526', grad]);
+  runConvert([
+    '-size', `${size}x${size}`, 'xc:none', '-fill', 'white',
+    '-draw', `roundrectangle ${s(7)},${s(7)} ${size - s(8)},${size - s(8)} ${s(52)},${s(52)}`, cardMask
+  ]);
   runConvert([grad, cardMask, '-compose', 'copyopacity', '-composite', card]);
   runConvert([rim, card, '-compose', 'over', '-composite', cardRimmed]);
 
-  runConvert([logoLight, '-resize', '186x', logoS]);
+  runConvert([logoLight, '-resize', `${s(186)}x`, logoS]);
   runConvert([cardRimmed, logoS, '-gravity', 'center', '-compose', 'over', '-composite', masterPath]);
 }
 
-function buildFromLogo() {
+function buildFromLogo(size = MASTER_SIZE) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'byd-icon-'));
   const masterPath = path.join(tmp, 'master.png');
-  buildMasterFromLogo(LOGO_PATH, masterPath, tmp);
+  buildMasterFromLogo(LOGO_PATH, masterPath, tmp, size);
 
-  const pngsBySize = SIZES.map((size) => {
-    const sized = path.join(tmp, `s${size}.png`);
-    runConvert([masterPath, '-resize', `${size}x${size}`, sized]);
-    return { size, png: fs.readFileSync(sized) };
-  });
-
-  fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), encodeIco(pngsBySize));
-  fs.copyFileSync(masterPath, path.join(OUT_DIR, 'icon.png'));
+  fs.copyFileSync(masterPath, ICON_PATH);
   fs.rmSync(tmp, { recursive: true, force: true });
-  console.log(`Wrote assets/icon.ico from logo.png (PNG, ${SIZES.join('/')} px)`);
+  console.log(`Wrote assets/icon.png from logo.png (${size}x${size} PNG)`);
 }
 
 /* ===================  Source 2: built-in glyph (fallback)  ================ */
@@ -275,11 +267,9 @@ function rasterise(size) {
   return data;
 }
 
-function buildGlyph() {
-  const pngsBySize = SIZES.map((size) => ({ size, png: encodePng(size, size, rasterise(size)) }));
-  fs.writeFileSync(path.join(OUT_DIR, 'icon.ico'), encodeIco(pngsBySize));
-  fs.writeFileSync(path.join(OUT_DIR, 'icon.png'), pngsBySize[pngsBySize.length - 1].png);
-  console.log(`Wrote assets/icon.ico from built-in glyph (PNG, ${SIZES.join('/')} px)`);
+function buildGlyph(size = MASTER_SIZE) {
+  fs.writeFileSync(ICON_PATH, encodePng(size, size, rasterise(size)));
+  console.log(`Wrote assets/icon.png from the built-in glyph (${size}x${size} PNG)`);
 }
 
 /* --------------------------------- main ---------------------------------- */
@@ -292,7 +282,7 @@ function build() {
       buildFromLogo();
     } else {
       console.warn('assets/logo.png found but ImageMagick "convert" is not on PATH.');
-      console.warn('Leaving the committed icon.ico untouched. Install ImageMagick to regenerate from the logo.');
+      console.warn('Leaving the committed icon.png untouched. Install it with: sudo apt install imagemagick');
     }
     return;
   }
@@ -302,4 +292,4 @@ function build() {
 
 if (require.main === module) build();
 
-module.exports = { build, buildFromLogo, buildGlyph, encodeIco, encodePng, rasterise, SIZES, OUT_DIR, LOGO_PATH };
+module.exports = { build, buildFromLogo, buildGlyph, encodePng, rasterise, pngSize, MASTER_SIZE, OUT_DIR, LOGO_PATH, ICON_PATH };

@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
 
-# electron-builder output (.exe, Setup.exe, Portable.exe, unpacked/, ...)
+# electron-builder output (BYD-<version>.AppImage, *.deb, linux-unpacked/, ...)
 dist/
 
 # Logs
@@ -11,6 +11,8 @@ npm-debug.log*
 # OS / editor noise
 .DS_Store
 Thumbs.db
+.directory
+.Trash-*
 *.swp
 .idea/
 .vscode/

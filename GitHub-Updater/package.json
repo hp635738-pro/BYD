@@ -1,8 +1,9 @@
 {
   "name": "byd-updater",
   "productName": "BYD",
+  "desktopName": "byd.desktop",
   "version": "1.0.0",
-  "description": "Standalone Windows utility that pulls the latest code for a local repository from GitHub and relaunches the app so the new code loads.",
+  "description": "Standalone Ubuntu utility that pulls the latest code for a local repository from GitHub and relaunches the app so the new code loads.",
   "main": "main.js",
   "private": true,
   "author": "BYD",
@@ -12,11 +13,13 @@
     "icon": "node tools/make-icon.js",
     "test": "node --test test/*.test.js",
     "verify:package": "node tools/verify-package.js",
-    "pack": "electron-builder --win --dir",
-    "build": "electron-builder --win",
-    "build:portable": "electron-builder --win portable"
+    "pack": "electron-builder --linux --dir",
+    "build": "electron-builder --linux",
+    "build:appimage": "electron-builder --linux AppImage",
+    "build:deb": "electron-builder --linux deb"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "electron": "^38.2.1",
     "electron-builder": "^26.0.12",
     "jsdom": "^27.0.0"
@@ -39,36 +42,52 @@
     ],
     "asar": true,
     "compression": "maximum",
-    "win": {
+    "linux": {
       "target": [
         {
-          "target": "nsis",
+          "target": "AppImage",
           "arch": [
             "x64"
           ]
         },
         {
-          "target": "portable",
+          "target": "deb",
           "arch": [
             "x64"
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "artifactName": "${productName}-${version}-Setup.${ext}"
+      "executableName": "byd",
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "packageCategory": "utils",
+      "maintainer": "BYD <hp635738-pro@users.noreply.github.com>",
+      "vendor": "BYD",
+      "synopsis": "Update the local BYD repository from GitHub",
+      "description": "BYD pulls the latest code for the selected local repository from GitHub (git pull origin main) and relaunches the application so the freshly pulled code runs.",
+      "syncDesktopName": true,
+      "desktop": {
+        "entry": {
+          "Keywords": "byd;git;github;update;updater;"
+        }
+      }
     },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "allowElevation": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "BYD",
-      "deleteAppDataOnUninstall": false
+    "appImage": {
+      "artifactName": "${productName}-${version}.${ext}"
     },
-    "portable": {
-      "artifactName": "${productName}-${version}-Portable.${ext}"
+    "deb": {
+      "depends": [
+        "git",
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0"
+      ]
     }
   }
 }

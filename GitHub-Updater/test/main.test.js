@@ -44,38 +44,46 @@ test('readConfig() rejects a missing remote or branch', () => {
  *  The git command itself
  * ================================================================== */
 
-test('buildGitInvocation() runs the pull through Windows CMD on win32', () => {
+test('buildGitInvocation() runs the pull with the git binary directly — no shell', () => {
   const { main } = loadMain();
-  const original = process.platform;
-  try {
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    const invocation = main.buildGitInvocation({ remote: 'origin', branch: 'main' });
-    assert.equal(invocation.command, 'cmd.exe');
-    assert.deepEqual(invocation.args, ['/d', '/s', '/c', 'git', 'pull', 'origin', 'main']);
-    assert.equal(invocation.label, 'git pull origin main');
-  } finally {
-    Object.defineProperty(process, 'platform', { value: original, configurable: true });
-  }
+  const invocation = main.buildGitInvocation({ remote: 'origin', branch: 'main', gitPath: '' });
+  assert.equal(process.platform, 'linux', 'this suite targets Ubuntu');
+  assert.equal(invocation.command, 'git');
+  assert.deepEqual(invocation.args, ['pull', 'origin', 'main']);
+  assert.equal(invocation.label, 'git pull origin main');
+  // Nothing is routed through a shell: arguments are never re-parsed by sh.
+  assert.doesNotMatch(JSON.stringify(invocation), /cmd|powershell|\bsh\b/i);
 });
 
 test('buildGitInvocation() honours the remote/branch from config.js', () => {
   const { main } = loadMain();
-  const original = process.platform;
-  try {
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    const invocation = main.buildGitInvocation({ remote: 'upstream', branch: 'release' });
-    assert.deepEqual(invocation.args, ['/d', '/s', '/c', 'git', 'pull', 'upstream', 'release']);
-  } finally {
-    Object.defineProperty(process, 'platform', { value: original, configurable: true });
-  }
+  const invocation = main.buildGitInvocation({ remote: 'upstream', branch: 'release', gitPath: '' });
+  assert.deepEqual(invocation.args, ['pull', 'upstream', 'release']);
+  assert.equal(invocation.label, 'git pull upstream release');
 });
 
-test('buildGitInvocation() calls git directly off Windows (so CI can run it)', () => {
+test('buildGitInvocation() uses config.gitPath when the binary is outside PATH', () => {
   const { main } = loadMain();
-  const invocation = main.buildGitInvocation({ remote: 'origin', branch: 'main' });
-  assert.notEqual(process.platform, 'win32');
-  assert.equal(invocation.command, 'git');
+  const invocation = main.buildGitInvocation({ remote: 'origin', branch: 'main', gitPath: '/usr/bin/git' });
+  assert.equal(invocation.command, '/usr/bin/git');
   assert.deepEqual(invocation.args, ['pull', 'origin', 'main']);
+  assert.equal(invocation.label, '/usr/bin/git pull origin main');
+});
+
+test('buildSpawnOptions() runs git inside the repository with no prompt and no Windows flags', () => {
+  const { main } = loadMain();
+  const options = main.buildSpawnOptions({ repoPath: '/home/user/BYD' });
+  assert.equal(options.cwd, '/home/user/BYD');
+  assert.equal('windowsHide' in options, false, 'windowsHide is a Windows-only spawn flag');
+  assert.equal(options.env.GIT_TERMINAL_PROMPT, '0', 'a missing credential must fail fast');
+  assert.equal(options.env.SSH_ASKPASS_REQUIRE, 'never', 'no invisible SSH passphrase prompt');
+});
+
+test('the configured git binary answers --version on this Linux host', () => {
+  const { execFileSync } = require('node:child_process');
+  const cfg = require(path.join(APP_DIR, 'config.js'));
+  const version = execFileSync(cfg.gitPath || 'git', ['--version'], { encoding: 'utf8' }).trim();
+  assert.match(version, /^git version \d+\.\d+/, 'git must be resolvable and runnable');
 });
 
 /* ================================================================== *
@@ -279,6 +287,7 @@ test('the git-pull IPC handler pushes live output to the renderer', async () => 
 
 test('the restart-app IPC handler relaunches and quits the app', async () => {
   const { main, electron } = loadMain();
+  delete process.env.APPIMAGE; // plain install (deb / npm start): stable execPath
   main.registerIpc();
   const handler = electron.__handlers.get('restart-app');
 
@@ -292,6 +301,111 @@ test('the restart-app IPC handler relaunches and quits the app', async () => {
 
   assert.equal(electron.__calls.relaunch, 1, 'app.relaunch() must be called');
   assert.equal(electron.__calls.quit, 1, 'app.quit() must be called');
+  assert.equal(electron.__calls.relaunchArgs, undefined, 'a stable execPath needs no override');
+});
+
+test('inside an AppImage, Update relaunches the .AppImage file (not the squashfs mount)', async () => {
+  const { main, electron } = loadMain();
+  const appImage = path.join(require('node:os').tmpdir(), `BYD-${process.pid}.AppImage`);
+  fs.writeFileSync(appImage, '#!/bin/sh\n');
+  const previous = process.env.APPIMAGE;
+  process.env.APPIMAGE = appImage;
+  try {
+    main.registerIpc();
+    electron.__handlers.get('restart-app')({ senderId: 9 });
+    await new Promise((r) => setTimeout(r, 400));
+
+    assert.equal(electron.__calls.relaunch, 1);
+    assert.equal(electron.__calls.relaunchArgs.execPath, appImage, 'the mount is gone after quit');
+    assert.deepEqual(electron.__calls.relaunchArgs.args, process.argv.slice(1));
+    assert.equal(electron.__calls.quit, 1);
+  } finally {
+    if (previous === undefined) delete process.env.APPIMAGE;
+    else process.env.APPIMAGE = previous;
+    fs.rmSync(appImage, { force: true });
+  }
+});
+
+/* ================================================================== *
+ *  Repository picker (Ubuntu directory chooser)
+ * ================================================================== */
+
+test('the picker is a directory-only chooser that opens in the home folder', async () => {
+  const { main, electron } = loadMain();
+  electron.__setDialogResult({ canceled: true, filePaths: [] });
+  main.registerIpc();
+
+  await electron.__handlers.get('choose-repository')({});
+
+  const { options } = electron.__dialogOptions[0];
+  assert.deepEqual(options.properties, ['openDirectory'], 'folders only, never files');
+  assert.equal(options.defaultPath, electron.__home, 'no repository yet -> start at $HOME');
+  assert.ok(options.buttonLabel, 'the chooser gets an explicit confirm label');
+});
+
+test('picking the BYD clone persists it via app.getPath("userData")', async () => {
+  const { main, electron, userData } = loadMain();
+  const fixture = makeRepoFixture();
+  electron.__setDialogResult({ canceled: false, filePaths: [fixture.local] });
+  main.registerIpc();
+
+  const result = await electron.__handlers.get('choose-repository')({});
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.repoPath, path.resolve(fixture.local));
+  const saved = JSON.parse(fs.readFileSync(path.join(userData, 'settings.json'), 'utf8'));
+  assert.equal(saved.repoPath, path.resolve(fixture.local), 'stored under ~/.config/BYD');
+  assert.equal(main.readConfig().repoPath, path.resolve(fixture.local), 'the next pull uses it');
+});
+
+test('the picker rejects a folder that is not a git repository', async () => {
+  const { main, electron } = loadMain();
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ghupdater-notrepo-'));
+  electron.__setDialogResult({ canceled: false, filePaths: [dir] });
+  main.registerIpc();
+
+  const result = await electron.__handlers.get('choose-repository')({});
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /not a Git repository/);
+});
+
+test('the picker rejects a clone of a different GitHub project', async () => {
+  const { main, electron } = loadMain();
+  const fixture = makeRepoFixture();
+  require('./helpers').git(['remote', 'set-url', 'origin', 'https://github.com/someone-else/other.git'], fixture.local);
+  electron.__setDialogResult({ canceled: false, filePaths: [fixture.local] });
+  main.registerIpc();
+
+  const result = await electron.__handlers.get('choose-repository')({});
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /hp635738-pro\/BYD/);
+});
+
+test('cancelling the picker keeps the previously configured repository', async () => {
+  const { main, electron, setRepoPath } = loadMain();
+  const fixture = makeRepoFixture();
+  setRepoPath(fixture.local);
+  electron.__setDialogResult({ canceled: true, filePaths: [] });
+  main.registerIpc();
+
+  const result = await electron.__handlers.get('choose-repository')({});
+
+  assert.deepEqual(result, { ok: false, canceled: true });
+  assert.equal(main.readConfig().repoPath, path.resolve(fixture.local));
+});
+
+test('once configured, the picker reopens at the saved repository', async () => {
+  const { main, electron, setRepoPath } = loadMain();
+  const fixture = makeRepoFixture();
+  setRepoPath(fixture.local);
+  electron.__setDialogResult({ canceled: true, filePaths: [] });
+  main.registerIpc();
+
+  await electron.__handlers.get('choose-repository')({});
+
+  assert.equal(electron.__dialogOptions[0].options.defaultPath, path.resolve(fixture.local));
 });
 
 test('the app-info IPC handler reports the configured repository', async () => {
