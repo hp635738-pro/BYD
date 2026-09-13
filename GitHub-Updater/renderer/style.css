@@ -1,39 +1,42 @@
 /* ==========================================================================
-   BYD Electron Updater — minimal dark utility theme
-   Palette: bg #0F1115 · surface/card #171A20 · secondary surface #1D2128
-            border #2A2F38 · accent red #E60012 · hover red #FF1A2A
-            text #F5F5F5 · muted #9CA3AF · success #16A34A · error red
-   Notes: clean, compact and flat — modest 6–8px radii, subtle 1px borders,
-          no gradients, glows or heavy shadows. Centred and balanced on a
-          maximised 1920×1080 window. All interactions have clear
-          hover / active / focus / disabled states with good contrast.
+   BYD Electron Updater — Apple-inspired premium desktop utility theme
+   Palette: bg #0B0C0F · panel #12141A · text #F5F5F5 · muted #9CA3AF
+            accent red #E60012 · hover red #FF1A2A · success #16A34A
+   Notes: minimal, calm and spacious — centred 560px column, generous
+          whitespace, lightweight stack (no heavy dashboard card), subtle
+          glass repo surface, solid red primary, restrained status pill.
+          No gradients, no glow, no blue. Excellent maximised at 1920x1080,
+          still usable in small windows via responsive compaction + scroll.
    ========================================================================== */
 
 :root {
-  --bg: #0F1115;
-  --surface: #171A20;
-  --card: #171A20;
-  --surface-2: #1D2128;
-  --border: #2A2F38;
-  --border-strong: #343A45;
+  --bg: #0B0C0F;
+  --panel: #12141A;
+  --panel-border: rgba(255, 255, 255, 0.07);
+  --secondary: #1A1E24;
+  --secondary-border: rgba(255, 255, 255, 0.08);
+  --secondary-hover: #232830;
 
   --text: #F5F5F5;
   --muted: #9CA3AF;
   --faint: #6B7280;
+  --subtle: #52525B;
 
   --red: #E60012;
   --red-hover: #FF1A2A;
   --red-active: #C90010;
   --red-soft: rgba(230, 0, 18, 0.10);
+  --red-tint-border: rgba(230, 0, 18, 0.45);
   --red-focus: rgba(230, 0, 18, 0.35);
 
   --green: #16A34A;
-  --green-hover: #1CB256;
-  --green-active: #138A3E;
-  --green-soft: rgba(22, 163, 74, 0.10);
+  --green-soft: rgba(22, 163, 74, 0.08);
+  --green-text: #86EFAC;
+  --error-text: #FCA5A5;
 
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -50,89 +53,158 @@ body {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  overflow: hidden;
+  overflow-y: auto;
   user-select: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shell — centred vertically + horizontally, balanced when maximised */
+/*  Shell — centred vertically + horizontally, calm at 1920x1080       */
 /* ------------------------------------------------------------------ */
 
 .shell {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 28px 24px 24px;
+  padding: 56px 24px;
   text-align: center;
 }
 
-/* ------------------------------ Heading -------------------------------- */
+.content {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 30px;
+}
+
+/* ------------------------------ Heading ------------------------------ */
 
 .heading {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.brand-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
 }
 
 .title {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  line-height: 1.15;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: var(--text);
 }
 
 .subtitle {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.01em;
   color: var(--muted);
 }
 
-/* -------------------------------- Card --------------------------------- */
+/* ---------------------------- Repository ----------------------------- */
 
-.card {
-  width: 100%;
-  max-width: 440px;
+.repo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.30);
+}
+
+.repo-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.repo-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.2;
+}
+
+.repo-path {
+  display: block;
+  min-height: 18px;
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: #D1D5DB;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-path:empty::before {
+  content: "No repository selected";
+  color: var(--faint);
+}
+
+/* --------------------- Actions — lightweight stack ------------------- */
+
+.actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-/* ------------------------------- Buttons ------------------------------- */
+/* ------------------------------- Buttons ----------------------------- */
 
 .btn {
   position: relative;
   width: 100%;
-  min-height: 40px;
+  min-height: 46px;
   padding: 10px 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   color: var(--text);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.15px;
+  letter-spacing: 0.01em;
   line-height: 1;
   cursor: pointer;
   overflow: hidden;
@@ -155,40 +227,43 @@ body {
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.995);
 }
 
 .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
   transform: none !important;
   box-shadow: none !important;
 }
 
-/* secondary — repository folder picker (dark, subtle border) */
+/* secondary — repository folder picker (quiet Apple-style control) */
 .btn-secondary {
-  background: var(--surface-2);
-  border-color: var(--border);
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  border-color: var(--secondary-border);
   color: #E5E7EB;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #232830;
-  border-color: var(--border-strong);
+  background: var(--secondary-hover);
+  border-color: rgba(255, 255, 255, 0.12);
   color: var(--text);
 }
 
 .btn-secondary:active:not(:disabled) {
-  background: var(--surface-2);
-  border-color: var(--border);
+  background: var(--secondary);
+  border-color: var(--secondary-border);
 }
 
 .btn-secondary:focus-visible {
-  outline-color: var(--border-strong);
-  box-shadow: 0 0 0 3px rgba(42, 47, 56, 0.5);
+  outline-color: #4B5563;
+  box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.35);
 }
 
-/* primary — Pull from GitHub (clean red) */
+/* primary — Pull from GitHub (clean solid red, no gloss, no glow) */
 .btn-primary {
   background: var(--red);
   border-color: var(--red);
@@ -205,29 +280,38 @@ body {
   border-color: var(--red-active);
 }
 
-/* success — Update (subtle green, visually distinct) */
-.btn-success {
-  background: var(--green);
-  border-color: var(--green);
-  color: #FFFFFF;
+.btn-primary:disabled {
+  opacity: 0.55;
 }
 
-.btn-success:hover:not(:disabled) {
-  background: var(--green-hover);
-  border-color: var(--green-hover);
+/* busy pull stays solid red with a spinner (not greyed out) */
+.btn-primary.is-busy {
+  opacity: 1;
 }
 
-.btn-success:active:not(:disabled) {
-  background: var(--green-active);
-  border-color: var(--green-active);
+/* update — subtle red when available, muted charcoal when disabled */
+.btn-update {
+  background: var(--red-soft);
+  border-color: var(--red-tint-border);
+  color: #FF6B75;
 }
 
-/* distinct disabled look for Update — keeps hierarchy when unavailable */
-.btn-success:disabled {
-  background: var(--surface-2);
-  border-color: var(--border);
-  color: var(--muted);
-  opacity: 0.5;
+.btn-update:hover:not(:disabled) {
+  background: rgba(230, 0, 18, 0.16);
+  border-color: rgba(230, 0, 18, 0.60);
+  color: #FF8089;
+}
+
+.btn-update:active:not(:disabled) {
+  background: rgba(230, 0, 18, 0.08);
+  border-color: var(--red-tint-border);
+}
+
+.btn-update:disabled {
+  background: #15181D;
+  border-color: #22262E;
+  color: #63666E;
+  opacity: 1;
 }
 
 .btn-label {
@@ -255,13 +339,13 @@ body {
   }
 }
 
-/* ------------------------------ Status area ---------------------------- */
+/* ------------------------------ Status area -------------------------- */
 
 .status {
   width: 100%;
-  max-width: 440px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
@@ -270,11 +354,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 30px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  min-height: 28px;
+  max-width: 100%;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition:
     color 0.2s var(--ease),
     background-color 0.2s var(--ease),
@@ -282,8 +367,8 @@ body {
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--faint);
@@ -291,8 +376,9 @@ body {
 }
 
 .status-text {
-  font-size: 12.5px;
-  font-weight: 450;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -301,11 +387,6 @@ body {
 }
 
 /* busy — subtle red pulse */
-.status-line.is-busy {
-  background: var(--surface);
-  border-color: var(--border);
-}
-
 .status-line.is-busy .status-dot {
   background: var(--red);
   animation: pulse-red 1.25s var(--ease) infinite;
@@ -317,7 +398,7 @@ body {
 
 .status-line.is-success {
   background: var(--green-soft);
-  border-color: rgba(22, 163, 74, 0.32);
+  border-color: rgba(22, 163, 74, 0.28);
 }
 
 .status-line.is-success .status-dot {
@@ -325,13 +406,13 @@ body {
 }
 
 .status-line.is-success .status-text {
-  color: #86EFAC;
-  font-weight: 600;
+  color: var(--green-text);
+  font-weight: 500;
 }
 
 .status-line.is-error {
   background: var(--red-soft);
-  border-color: rgba(230, 0, 18, 0.32);
+  border-color: rgba(230, 0, 18, 0.28);
 }
 
 .status-line.is-error .status-dot {
@@ -339,8 +420,8 @@ body {
 }
 
 .status-line.is-error .status-text {
-  color: #FCA5A5;
-  font-weight: 600;
+  color: var(--error-text);
+  font-weight: 500;
 }
 
 @keyframes pulse-red {
@@ -358,8 +439,9 @@ body {
 /* Live git output console */
 .output {
   margin: 0;
-  max-height: 112px;
-  padding: 10px 12px;
+  width: 100%;
+  max-height: 120px;
+  padding: 12px;
   overflow-y: auto;
   text-align: left;
   white-space: pre-wrap;
@@ -368,10 +450,14 @@ body {
   font-size: 11.5px;
   line-height: 1.55;
   color: #D1D5DB;
-  background: #101317;
-  border: 1px solid var(--border);
+  background: #08090C;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-sm);
   user-select: text;
+}
+
+.output[hidden] {
+  display: none;
 }
 
 .output .line-err {
@@ -388,34 +474,71 @@ body {
 }
 
 .output::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: #2A2F38;
   border-radius: 6px;
 }
 
 .output::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
+  background: #343A45;
 }
 
 .output::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* -------------------------------- Footer ------------------------------- */
+/* -------------------------------- Footer ----------------------------- */
 
 .footer {
   width: 100%;
-  max-width: 440px;
   min-height: 14px;
+  text-align: center;
 }
 
-.repo-path,
 .ui-source {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 400;
-  letter-spacing: 0.1px;
-  color: var(--faint);
+  letter-spacing: 0.01em;
+  color: var(--subtle);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
+}
+
+/* ------------------------- Small-window compaction ------------------- */
+
+@media (max-height: 640px) {
+  .shell {
+    padding: 32px 24px;
+  }
+
+  .content {
+    gap: 20px;
+  }
+
+  .title {
+    font-size: 32px;
+  }
+
+  .repo-panel {
+    padding: 14px;
+  }
+
+  .output {
+    max-height: 88px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding: 32px 16px;
+  }
+
+  .content {
+    max-width: 100%;
+  }
+
+  .title {
+    font-size: 34px;
+  }
 }
