@@ -23,7 +23,7 @@ logo (`assets/logo.png` → `assets/icon.ico`).
 └───────────────────────────────────────────────┘
 ```
 
-Opens maximised · resizable · normal Windows controls · dark black/red UI · rounded cards · no menu bar.
+Opens maximised · resizable · normal Windows controls · minimal dark `#0F1115` UI with red accents · modest rounded cards · no menu bar.
 
 ---
 
@@ -300,7 +300,7 @@ What was actually executed against this code (`npm test`, 65 tests, all passing)
 * The **real `renderer.js`** is evaluated in a jsdom DOM built from the real `index.html`:
   button enable/disable rules, the exact success string, green/red status classes, live
   output rendering, double-click guarding, restart locking.
-* `createWindow()` is asserted to produce a resizable, maximizable, centred, `#0B0D10`,
+* `createWindow()` is asserted to produce a resizable, maximizable, centred, `#0F1115`,
   menu-less, context-isolated window.
 * **Repository-provided UI, end to end:** a renderer with one `style.css` is pushed to the
   fixture remote, the app pulls it, and the test asserts the window was reloaded into a

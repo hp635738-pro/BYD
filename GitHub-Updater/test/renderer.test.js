@@ -113,10 +113,15 @@ test('both buttons share the same full-card width', () => {
   assert.match(CSS, /\.btn\s*\{[^}]*width:\s*100%/s, '.btn is full width, so both buttons are equal width');
 });
 
-test('the palette matches the dark black/red design spec', () => {
-  assert.match(CSS, /--bg:\s*#0b0d10/i, 'background #0B0D10');
-  assert.match(CSS, /--card:\s*#15181d/i, 'card #15181D');
+test('the palette matches the minimal dark design spec', () => {
+  assert.match(CSS, /--bg:\s*#0f1115/i, 'background #0F1115');
+  assert.match(CSS, /--card:\s*#171a20/i, 'card #171A20');
+  assert.match(CSS, /--surface-2:\s*#1d2128/i, 'secondary surface #1D2128');
+  assert.match(CSS, /--border:\s*#2a2f38/i, 'border #2A2F38');
   assert.match(CSS, /--red:\s*#e60012/i, 'primary button red');
+  assert.match(CSS, /--red-hover:\s*#ff1a2a/i, 'hover accent #FF1A2A');
+  assert.match(CSS, /--text:\s*#f5f5f5/i, 'main text #F5F5F5');
+  assert.match(CSS, /--muted:\s*#9ca3af/i, 'secondary text #9CA3AF');
   assert.match(CSS, /--green:\s*#16a34a/i, 'update button green');
   assert.match(CSS, /\.card\s*\{[^}]*border-radius:\s*var\(--radius\)/s, 'rounded card');
   assert.match(CSS, /transition:[^;]*transform/s, 'smooth hover animation');

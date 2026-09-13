@@ -36,7 +36,7 @@ const pkg = require('./package.json');
  * ------------------------------------------------------------------ */
 const WINDOW_WIDTH = 520;
 const WINDOW_HEIGHT = 420;
-const BACKGROUND_COLOR = '#0B0D10';
+const BACKGROUND_COLOR = '#0F1115';
 const APP_TITLE = 'BYD';
 const RELAUNCH_DELAY_MS = 150; // let the IPC reply reach the renderer first
 

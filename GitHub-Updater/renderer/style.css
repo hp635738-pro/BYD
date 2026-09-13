@@ -1,39 +1,39 @@
 /* ==========================================================================
-   BYD Electron Updater — premium automotive-tech theme
-   Palette: bg #0B0D10 · surface/card #15181D · border #2A2E35
-            accent red #E60012 · hover red #FF0F1F · text #FFFFFF
-            muted #9CA3AF · success #16A34A · error #E60012
-   Notes: minimal, clean, no heavy gradients — centred and polished on
-          a maximised 1920×1080 window. All interactions have clear
+   BYD Electron Updater — minimal dark utility theme
+   Palette: bg #0F1115 · surface/card #171A20 · secondary surface #1D2128
+            border #2A2F38 · accent red #E60012 · hover red #FF1A2A
+            text #F5F5F5 · muted #9CA3AF · success #16A34A · error red
+   Notes: clean, compact and flat — modest 6–8px radii, subtle 1px borders,
+          no gradients, glows or heavy shadows. Centred and balanced on a
+          maximised 1920×1080 window. All interactions have clear
           hover / active / focus / disabled states with good contrast.
    ========================================================================== */
 
 :root {
-  --bg: #0B0D10;
-  --surface: #15181D;
-  --card: #15181D;
-  --border: #2A2E35;
-  --border-strong: #323842;
+  --bg: #0F1115;
+  --surface: #171A20;
+  --card: #171A20;
+  --surface-2: #1D2128;
+  --border: #2A2F38;
+  --border-strong: #343A45;
 
-  --text: #FFFFFF;
+  --text: #F5F5F5;
   --muted: #9CA3AF;
   --faint: #6B7280;
 
   --red: #E60012;
-  --red-hover: #FF0F1F;
-  --red-active: #C40010;
-  --red-glow: rgba(230, 0, 18, 0.32);
-  --red-focus: rgba(230, 0, 18, 0.42);
+  --red-hover: #FF1A2A;
+  --red-active: #C90010;
   --red-soft: rgba(230, 0, 18, 0.10);
+  --red-focus: rgba(230, 0, 18, 0.35);
 
   --green: #16A34A;
-  --green-hover: #1AB054;
-  --green-active: #15803D;
-  --green-glow: rgba(22, 163, 74, 0.32);
+  --green-hover: #1CB256;
+  --green-active: #138A3E;
   --green-soft: rgba(22, 163, 74, 0.10);
 
-  --radius: 16px;
-  --radius-btn: 10px;
+  --radius: 8px;
+  --radius-sm: 6px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -60,7 +60,7 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shell — centred vertically + horizontally, polished when maximised */
+/*  Shell — centred vertically + horizontally, balanced when maximised */
 /* ------------------------------------------------------------------ */
 
 .shell {
@@ -69,8 +69,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 32px 24px 24px;
+  gap: 18px;
+  padding: 28px 24px 24px;
   text-align: center;
 }
 
@@ -80,21 +80,21 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .title {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: -0.6px;
-  line-height: 1.1;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
   color: var(--text);
 }
 
 .subtitle {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.2px;
   color: var(--muted);
@@ -104,17 +104,15 @@ body {
 
 .card {
   width: 100%;
-  max-width: 460px;
-  padding: 20px;
+  max-width: 440px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.45),
-    0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 /* ------------------------------- Buttons ------------------------------- */
@@ -122,35 +120,34 @@ body {
 .btn {
   position: relative;
   width: 100%;
-  min-height: 44px;
-  padding: 11px 18px;
+  min-height: 40px;
+  padding: 10px 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
+  gap: 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-btn);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.15px;
   line-height: 1;
   cursor: pointer;
   overflow: hidden;
   transition:
-    transform 0.18s var(--ease),
-    background-color 0.18s var(--ease),
-    border-color 0.18s var(--ease),
-    box-shadow 0.18s var(--ease),
-    opacity 0.18s var(--ease),
-    filter 0.18s var(--ease);
+    transform 0.15s var(--ease),
+    background-color 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    color 0.15s var(--ease),
+    opacity 0.15s var(--ease);
 }
 
 .btn:focus-visible {
   outline: 2px solid var(--red);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--red-soft);
+  box-shadow: 0 0 0 3px var(--red-soft);
 }
 
 .btn:hover:not(:disabled) {
@@ -158,41 +155,37 @@ body {
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.985);
+  transform: translateY(0);
 }
 
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-  filter: saturate(0.55);
-  box-shadow: none !important;
   transform: none !important;
+  box-shadow: none !important;
 }
 
 /* secondary — repository folder picker (dark, subtle border) */
 .btn-secondary {
-  background: #1E232A;
+  background: var(--surface-2);
   border-color: var(--border);
   color: #E5E7EB;
-  box-shadow: none;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #252A33;
+  background: #232830;
   border-color: var(--border-strong);
-  color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  color: var(--text);
 }
 
 .btn-secondary:active:not(:disabled) {
-  background: #1A1E24;
+  background: var(--surface-2);
   border-color: var(--border);
-  box-shadow: none;
 }
 
 .btn-secondary:focus-visible {
-  outline-color: #3A404C;
-  box-shadow: 0 0 0 4px rgba(42, 46, 53, 0.55);
+  outline-color: var(--border-strong);
+  box-shadow: 0 0 0 3px rgba(42, 47, 56, 0.5);
 }
 
 /* primary — Pull from GitHub (clean red) */
@@ -200,48 +193,41 @@ body {
   background: var(--red);
   border-color: var(--red);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px var(--red-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--red-hover);
   border-color: var(--red-hover);
-  box-shadow: 0 6px 18px rgba(230, 0, 18, 0.38);
 }
 
 .btn-primary:active:not(:disabled) {
   background: var(--red-active);
   border-color: var(--red-active);
-  box-shadow: 0 2px 8px rgba(230, 0, 18, 0.28);
 }
 
-/* success — Update (tasteful green, visually distinct) */
+/* success — Update (subtle green, visually distinct) */
 .btn-success {
   background: var(--green);
   border-color: var(--green);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px var(--green-glow);
 }
 
 .btn-success:hover:not(:disabled) {
   background: var(--green-hover);
   border-color: var(--green-hover);
-  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.36);
 }
 
 .btn-success:active:not(:disabled) {
   background: var(--green-active);
   border-color: var(--green-active);
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
 }
 
 /* distinct disabled look for Update — keeps hierarchy when unavailable */
 .btn-success:disabled {
-  background: #1E232A;
+  background: var(--surface-2);
   border-color: var(--border);
   color: var(--muted);
   opacity: 0.5;
-  box-shadow: none;
 }
 
 .btn-label {
@@ -255,7 +241,7 @@ body {
   display: inline-block;
   width: 12px;
   height: 12px;
-  margin-left: 9px;
+  margin-left: 8px;
   vertical-align: -1px;
   border: 2px solid rgba(255, 255, 255, 0.32);
   border-top-color: #FFFFFF;
@@ -273,10 +259,10 @@ body {
 
 .status {
   width: 100%;
-  max-width: 460px;
+  max-width: 440px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .status-line {
@@ -284,16 +270,15 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 28px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: rgba(21, 24, 29, 0.9);
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   border: 1px solid var(--border);
   transition:
     color 0.2s var(--ease),
     background-color 0.2s var(--ease),
-    border-color 0.2s var(--ease),
-    box-shadow 0.2s var(--ease);
+    border-color 0.2s var(--ease);
 }
 
 .status-dot {
@@ -317,13 +302,12 @@ body {
 
 /* busy — subtle red pulse */
 .status-line.is-busy {
-  background: rgba(21, 24, 29, 0.95);
+  background: var(--surface);
   border-color: var(--border);
 }
 
 .status-line.is-busy .status-dot {
   background: var(--red);
-  box-shadow: 0 0 0 0 var(--red-glow);
   animation: pulse-red 1.25s var(--ease) infinite;
 }
 
@@ -338,7 +322,6 @@ body {
 
 .status-line.is-success .status-dot {
   background: var(--green);
-  box-shadow: 0 0 10px var(--green-glow);
 }
 
 .status-line.is-success .status-text {
@@ -353,7 +336,6 @@ body {
 
 .status-line.is-error .status-dot {
   background: var(--red);
-  box-shadow: 0 0 10px rgba(230, 0, 18, 0.38);
 }
 
 .status-line.is-error .status-text {
@@ -363,10 +345,10 @@ body {
 
 @keyframes pulse-red {
   0% {
-    box-shadow: 0 0 0 0 var(--red-glow);
+    box-shadow: 0 0 0 0 rgba(230, 0, 18, 0.30);
   }
   70% {
-    box-shadow: 0 0 0 7px rgba(230, 0, 18, 0);
+    box-shadow: 0 0 0 5px rgba(230, 0, 18, 0);
   }
   100% {
     box-shadow: 0 0 0 0 rgba(230, 0, 18, 0);
@@ -377,7 +359,7 @@ body {
 .output {
   margin: 0;
   max-height: 112px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   overflow-y: auto;
   text-align: left;
   white-space: pre-wrap;
@@ -386,9 +368,9 @@ body {
   font-size: 11.5px;
   line-height: 1.55;
   color: #D1D5DB;
-  background: #0F1215;
+  background: #101317;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   user-select: text;
 }
 
@@ -406,13 +388,12 @@ body {
 }
 
 .output::-webkit-scrollbar-thumb {
-  background: #2A2E35;
-  border-radius: 8px;
-  border: 1px solid #1E232A;
+  background: var(--border);
+  border-radius: 6px;
 }
 
 .output::-webkit-scrollbar-thumb:hover {
-  background: #323842;
+  background: var(--border-strong);
 }
 
 .output::-webkit-scrollbar-track {
@@ -423,7 +404,7 @@ body {
 
 .footer {
   width: 100%;
-  max-width: 460px;
+  max-width: 440px;
   min-height: 14px;
 }
 
@@ -437,5 +418,4 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
-  opacity: 0.9;
 }
