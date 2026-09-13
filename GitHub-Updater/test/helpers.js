@@ -20,6 +20,9 @@ function makeElectronStub() {
   const handlers = new Map();
   const appListeners = new Map();
   const calls = { quit: 0, relaunch: 0, relaunchArgs: null, menu: null, name: null };
+  /** What dialog.showOpenDialog returns next; set via __setDialogResult(). */
+  let dialogResult = { canceled: true, filePaths: [] };
+  const dialogOptions = [];
 
   class FakeWebContents {
     constructor() {
@@ -77,10 +80,15 @@ function makeElectronStub() {
   FakeBrowserWindow.instances = [];
 
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'ghupdater-userdata-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ghupdater-home-'));
+
+  // Electron's real getPath() contract: every named folder resolves to a
+  // per-user directory. On Ubuntu userData is ~/.config/<app>, home is ~.
+  const appPaths = { userData, home, temp: os.tmpdir(), desktop: home, documents: home, downloads: home };
 
   const app = {
     isPackaged: false,
-    getPath: (name) => (name === 'userData' ? userData : os.tmpdir()),
+    getPath: (name) => (name in appPaths ? appPaths[name] : os.tmpdir()),
     whenReady: () => new Promise(() => {}), // never resolves: tests drive things directly
     requestSingleInstanceLock: () => true,
     on: (event, fn) => {
@@ -101,6 +109,15 @@ function makeElectronStub() {
     }
   };
 
+  // Stand-in for the GTK/xdg-desktop-portal directory chooser used on Ubuntu.
+  const dialog = {
+    showOpenDialog: async (parent, options) => {
+      dialogOptions.push({ parent, options });
+      const result = typeof dialogResult === 'function' ? dialogResult(options) : dialogResult;
+      return result;
+    }
+  };
+
   const stub = {
     app,
     BrowserWindow: FakeBrowserWindow,
@@ -114,11 +131,17 @@ function makeElectronStub() {
       on: () => {},
       removeHandler: (channel) => handlers.delete(channel)
     },
+    dialog,
     contextBridge: { exposeInMainWorld: () => {} },
     ipcRenderer: { invoke: async () => {}, on: () => {}, removeListener: () => {} },
     __handlers: handlers,
     __calls: calls,
     __userData: userData,
+    __home: home,
+    __dialogOptions: dialogOptions,
+    __setDialogResult: (result) => {
+      dialogResult = result;
+    },
     __appListeners: appListeners
   };
 

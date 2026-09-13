@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- *  tools/verify-package.js — checks the payload that ships inside the .exe
+ *  tools/verify-package.js — checks the payload that ships in the AppImage
  * ============================================================================
  *  Rebuilds the exact file set described by package.json → build.files,
  *  packs it into an app.asar with the same @electron/asar library
@@ -14,7 +14,7 @@
  *    - the packed package.json points at main.js
  *
  *  This is the part of `npm run build` that can be validated without
- *  downloading the Electron Windows runtime.
+ *  downloading the Electron Linux runtime.
  *
  *      npm run verify:package
  * ============================================================================
@@ -79,13 +79,13 @@ async function main() {
     'renderer/index.html',
     'renderer/style.css',
     'renderer/renderer.js',
-    'assets/icon.ico'
+    'assets/icon.png'
   ];
   for (const entry of mustHave) {
     if (!listed.includes(entry)) failures.push(`missing from the package: ${entry}`);
   }
 
-  const mustNotHave = ['test', 'tools', 'node_modules', 'dist', '.gitignore'];
+  const mustNotHave = ['test', 'tools', 'node_modules', 'dist', '.gitignore', 'assets/icon.ico'];
   for (const entry of mustNotHave) {
     if (listed.some((p) => p === entry || p.startsWith(`${entry}/`))) {
       failures.push(`dev-only material shipped: ${entry}`);
@@ -100,6 +100,11 @@ async function main() {
   const packedPkg = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   if (packedPkg.main !== 'main.js') failures.push('packed package.json main is not main.js');
   if (packedPkg.name !== 'byd-updater') failures.push('packed package.json name is wrong');
+
+  // Ubuntu-only: the packaged manifest must not carry any Windows packaging config.
+  if (packedPkg.build && (packedPkg.build.win || packedPkg.build.nsis || packedPkg.build.portable)) {
+    failures.push('packed package.json still contains Windows packaging config (win/nsis/portable)');
+  }
 
   const size = fs.statSync(archive).size;
   console.log(`\napp.asar size: ${size} bytes`);

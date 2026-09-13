@@ -2,29 +2,32 @@
 
 /**
  * ============================================================================
- *  BYD — main (Electron) process
+ *  BYD — main (Electron) process — Ubuntu 24.04 LTS
  * ============================================================================
  *  Responsibilities:
  *    - createWindow()                  -> the single 520x420 dark window
  *    - ipcMain.handle('git-pull')      -> runs `git pull <remote> <branch>`
- *                                         through Windows CMD (cmd.exe) and
+ *                                         with the system `git` binary and
  *                                         streams live output to the renderer
  *    - ipcMain.handle('restart-app')   -> app.relaunch() + app.quit()
+ *                                         (AppImage-aware, see relaunchApp())
  *    - repository-provided UI          -> after "Pull from GitHub" the window
  *                                         reloads <repo>/GitHub-Updater/renderer
  *                                         (via an atomic snapshot), so UI/code
  *                                         updates merged on GitHub appear
  *                                         without rebuilding or reinstalling
- *                                         the installed BYD.exe
+ *                                         the installed BYD AppImage
  *
- *  All paths come from ./config.js — nothing is hardcoded here.
+ *  All paths come from ./config.js or from Electron's app.getPath() — nothing
+ *  is hardcoded, and every path is built with `path.join()`/`path.resolve()`
+ *  so it is a plain POSIX path on Ubuntu (XDG: ~/.config/BYD, ~/.cache/BYD).
  * ============================================================================
  */
 
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 
@@ -57,17 +60,36 @@ let activePull = null; // guards against two pulls running at once
  * ================================================================== */
 
 /**
+ * Per-user settings file, resolved through Electron's app.getPath() so it
+ * lands in the XDG config directory on Ubuntu:
+ *
+ *   ~/.config/BYD/settings.json
+ *
+ * This is the ONLY place the settings location is computed — nothing in the
+ * app ever builds a path from a hardcoded prefix or an environment variable.
+ */
+function settingsFile() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+/** Read the saved repository path ('' when none is stored yet). */
+function readSavedRepoPath() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
+    return typeof saved.repoPath === 'string' ? saved.repoPath.trim() : '';
+  } catch {
+    return ''; // first run or invalid settings
+  }
+}
+
+/**
  * Resolve + validate the repository path from config.js.
  * Throws a human readable Error when it is missing or unusable.
  *
- * @returns {{repoPath: string, remote: string, branch: string, timeoutMs: number}}
+ * @returns {{repoPath: string, remote: string, branch: string, timeoutMs: number, gitPath: string}}
  */
 function readConfig() {
-  let raw = '';
-  try {
-    const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'settings.json'), 'utf8'));
-    raw = typeof saved.repoPath === 'string' ? saved.repoPath.trim() : '';
-  } catch { /* first run or invalid settings */ }
+  const raw = readSavedRepoPath();
   if (!raw) throw new Error('No repository is configured. Choose the BYD repository folder first.');
 
   const remote = (config.remote || '').trim();
@@ -77,8 +99,10 @@ function readConfig() {
   }
 
   const timeoutMs = Number.isFinite(config.timeoutMs) ? Math.max(0, config.timeoutMs) : 0;
+  // Optional override for the git binary (default: resolved from PATH).
+  const gitPath = typeof config.gitPath === 'string' ? config.gitPath.trim() : '';
 
-  return { repoPath: path.resolve(raw), remote, branch, timeoutMs };
+  return { repoPath: path.resolve(raw), remote, branch, timeoutMs, gitPath };
 }
 
 /**
@@ -97,16 +121,19 @@ function inspectRepo(repoPath) {
   return { exists: true, isDirectory, isGitRepo };
 }
 
-function remoteMatches(repoPath, remote) {
+/**
+ * Check that `<remote>` in `repoPath` points at hp635738-pro/BYD, using the
+ * same git binary the pull will use (config.gitPath, default `git` from PATH).
+ */
+function remoteMatches(repoPath, remote, gitPath) {
   try {
-    const { execFileSync } = require('child_process');
-    const url = execFileSync('git', ['-C', repoPath, 'config', '--get', `remote.${remote}.url`], { encoding: 'utf8' }).trim().toLowerCase();
+    const url = execFileSync(gitPath || 'git', ['-C', repoPath, 'config', '--get', `remote.${remote}.url`], { encoding: 'utf8' }).trim().toLowerCase();
     return /github\.com[/:]hp635738-pro\/byd(?:\.git)?$/.test(url);
   } catch { return false; }
 }
 
 function saveRepoPath(repoPath) {
-  const file = path.join(app.getPath('userData'), 'settings.json');
+  const file = settingsFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ repoPath }, null, 2), 'utf8');
 }
@@ -114,27 +141,39 @@ function saveRepoPath(repoPath) {
 /**
  * Build the exact command that performs the pull.
  *
- * On Windows this goes through CMD, as required:
- *   cmd.exe /d /s /c git pull origin main
+ * On Ubuntu the system `git` binary is invoked directly (no shell):
  *
- * On other platforms `git` is invoked directly. This keeps the Windows
- * behaviour exactly as specified while letting the same code path be
- * exercised (and unit-tested) on Linux/macOS build machines and CI.
+ *   git pull origin main
+ *
+ * Spawning `git` without a shell means arguments are never re-parsed by
+ * sh/bash, so a repository path or branch containing spaces or shell
+ * metacharacters stays safe.
  */
 function buildGitInvocation(cfg) {
   const gitArgs = ['pull', cfg.remote, cfg.branch];
+  const command = (cfg && typeof cfg.gitPath === 'string' && cfg.gitPath.trim()) || 'git';
+  return { command, args: gitArgs, label: `${command} ${gitArgs.join(' ')}` };
+}
 
-  if (process.platform === 'win32') {
-    return {
-      command: process.env.ComSpec || 'cmd.exe',
-      // /d = skip AutoRun, /s = keep quoting rules, /c = run then terminate.
-      // Arguments are passed as an array so Node quotes them safely.
-      args: ['/d', '/s', '/c', 'git', ...gitArgs],
-      label: `git ${gitArgs.join(' ')}`
-    };
-  }
-
-  return { command: 'git', args: gitArgs, label: `git ${gitArgs.join(' ')}` };
+/**
+ * Build the spawn options used for the git child process.
+ *
+ * `cwd` is the resolved repository path (already an absolute POSIX path from
+ * app.getPath()-backed settings), and the environment disables every prompt
+ * git could raise on a desktop session so a missing credential fails fast
+ * with a visible error instead of hanging behind an invisible dialog.
+ */
+function buildSpawnOptions(cfg) {
+  return {
+    cwd: cfg.repoPath,
+    env: {
+      ...process.env,
+      // Never block the UI waiting for a password we cannot type.
+      GIT_TERMINAL_PROMPT: '0',
+      // No SSH_ASKPASS GUI prompt either (e.g. a passphrase-less agent miss).
+      SSH_ASKPASS_REQUIRE: 'never'
+    }
+  };
 }
 
 /* ================================================================== *
@@ -245,7 +284,7 @@ function runGitPull(options = {}) {
     });
   }
 
-  if (!remoteMatches(cfg.repoPath, cfg.remote)) {
+  if (!remoteMatches(cfg.repoPath, cfg.remote, cfg.gitPath)) {
     const message = `The Git remote must point to hp635738-pro/BYD (using ${cfg.remote}).`;
     onEvent({ type: 'state', text: message }); onEvent({ type: 'done', text: '' });
     return Promise.resolve({ ok: false, reason: 'wrong-remote', exitCode: null, stdout: '', stderr: message, message, command: '', repoPath: cfg.repoPath });
@@ -257,16 +296,7 @@ function runGitPull(options = {}) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(invocation.command, invocation.args, {
-        cwd: cfg.repoPath,
-        env: {
-          ...process.env,
-          // Never block the UI waiting for a password we cannot type.
-          GIT_TERMINAL_PROMPT: '0',
-          GCM_INTERACTIVE: 'never'
-        },
-        windowsHide: true
-      });
+      child = spawn(invocation.command, invocation.args, buildSpawnOptions(cfg));
     } catch (err) {
       const message = `Could not start the command: ${err.message}`;
       onEvent({ type: 'stderr', text: message });
@@ -327,7 +357,7 @@ function runGitPull(options = {}) {
     child.on('error', (err) => {
       const message =
         err && err.code === 'ENOENT'
-          ? 'Git was not found. Install Git for Windows and make sure it is on the PATH.'
+          ? 'Git was not found. Install it with "sudo apt install git" and make sure it is on the PATH.'
           : `Command failed to start: ${err.message}`;
       onEvent({ type: 'stderr', text: message });
       finish({
@@ -382,6 +412,16 @@ function runGitPull(options = {}) {
  * ================================================================== */
 
 /**
+ * Working directory for the optional project launch: the repository the user
+ * picked (an absolute POSIX path persisted next to app.getPath('userData')),
+ * falling back to the current working directory. Never a hardcoded path.
+ */
+function projectLaunchCwd() {
+  const saved = readSavedRepoPath();
+  return saved ? path.resolve(saved) : process.cwd();
+}
+
+/**
  * If config.js defines `projectLaunch`, start the updated project so its
  * freshly pulled code loads. Failures are reported but never block the
  * updater restart.
@@ -394,10 +434,9 @@ function launchProject(onEvent = () => {}) {
 
   try {
     const child = spawn(spec.command, Array.isArray(spec.args) ? spec.args : [], {
-      cwd: (spec.cwd && spec.cwd.trim()) || (config.repoPath || process.cwd()),
+      cwd: (spec.cwd && spec.cwd.trim()) || projectLaunchCwd(),
       detached: true,
-      stdio: 'ignore',
-      windowsHide: false
+      stdio: 'ignore'
     });
     child.on('error', (err) => {
       onEvent({ type: 'stderr', text: `Could not start the project: ${err.message}` });
@@ -414,17 +453,18 @@ function launchProject(onEvent = () => {}) {
 /* ================================================================== *
  *  Repository-provided UI (the "install once" mechanism)
  * ================================================================== *
- *  The installed BYD.exe is only a stable bootstrap. The UI it shows
- *  (index.html / renderer.js / style.css) is taken from the selected
- *  repository — `<repo>/GitHub-Updater/renderer` — so a `git pull` is
- *  enough to update the application; no rebuild or reinstall needed.
+ *  The installed BYD AppImage (or .deb) is only a stable bootstrap. The UI
+ *  it shows (index.html / renderer.js / style.css) is taken from the
+ *  selected repository — `<repo>/GitHub-Updater/renderer` — so a `git pull`
+ *  is enough to update the application; no rebuild or reinstall needed.
  *
  *  Files are never loaded straight from the working tree. After a pull
  *  finishes (and on start-up) the renderer folder is validated, hashed
- *  and copied into `<userData>/ui-cache/<hash>/renderer` — into a temp
- *  folder first, then renamed into place — so the window can only ever
- *  load a complete, consistent snapshot. If anything about the
- *  repository UI is unusable, the packaged renderer is used instead.
+ *  and copied into `app.getPath('userData')/ui-cache/<hash>/renderer`
+ *  (~/.config/BYD/ui-cache/… on Ubuntu) — into a temp folder first, then
+ *  renamed into place — so the window can only ever load a complete,
+ *  consistent snapshot. If anything about the repository UI is unusable,
+ *  the packaged renderer is used instead.
  */
 
 /** Files a usable renderer must provide. */
@@ -634,7 +674,8 @@ function createWindow() {
     show: false,
     backgroundColor: BACKGROUND_COLOR,
     autoHideMenuBar: true,
-    icon: path.join(__dirname, 'assets', 'icon.ico'),
+    // Linux window/taskbar icon: a PNG (the .ico used on Windows is gone).
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -688,14 +729,35 @@ function emitToRenderer(channel, payload) {
   }
 }
 
+/**
+ * Where the Ubuntu directory chooser should open: the repository that is
+ * already configured when it still exists, otherwise the user's home folder.
+ * Both come from Electron (app.getPath) / the saved settings — never a
+ * hardcoded prefix, and the GTK directory picker gets an absolute POSIX path
+ * it can actually start in.
+ */
+function pickerDefaultPath() {
+  const saved = readSavedRepoPath();
+  const resolved = saved ? path.resolve(saved) : '';
+  if (resolved && fs.existsSync(resolved)) return resolved;
+  return app.getPath('home');
+}
+
 function registerIpc() {
   ipcMain.handle('choose-repository', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'], title: 'Select the BYD Git repository' });
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select the BYD Git repository',
+      buttonLabel: 'Select repository',
+      // Directory-only picker: on Ubuntu this opens the GTK/xdg-desktop-portal
+      // folder chooser, which cannot create or select files.
+      properties: ['openDirectory'],
+      defaultPath: pickerDefaultPath()
+    });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
     const selected = path.resolve(result.filePaths[0]);
     const info = inspectRepo(selected);
     if (!info.isGitRepo) return { ok: false, message: 'Selected folder is not a Git repository.' };
-    if (!remoteMatches(selected, config.remote)) return { ok: false, message: 'Selected repository remote must point to hp635738-pro/BYD.' };
+    if (!remoteMatches(selected, config.remote, config.gitPath)) return { ok: false, message: 'Selected repository remote must point to hp635738-pro/BYD.' };
     saveRepoPath(selected);
     const reloading = refreshUiAfterChange({ repoSelected: '1' });
     return { ok: true, repoPath: selected, reloading };
@@ -742,12 +804,31 @@ function registerIpc() {
     // Give the renderer a moment to render "Restarting…" and resolve its
     // await before the process goes away.
     setTimeout(() => {
-      app.relaunch();
+      relaunchApp();
       app.quit();
     }, RELAUNCH_DELAY_MS);
 
     return { ok: true, relaunching: true, requestId: event && event.senderId };
   });
+}
+
+/**
+ * Restart the application (the "Update" button).
+ *
+ * Inside an AppImage `process.execPath` points at the binary in the
+ * throw-away squashfs mount (/tmp/.mount_BYD-xxxxxx/byd), which is unmounted
+ * as soon as the process exits — relaunching it would fail. The AppImage
+ * runtime exports the real file path as $APPIMAGE, so relaunch that instead.
+ * A .deb install (/opt/BYD/byd) has a stable execPath and needs no override.
+ */
+function relaunchApp() {
+  const appImage = process.env.APPIMAGE;
+  if (appImage && fs.existsSync(appImage)) {
+    app.relaunch({ execPath: appImage, args: process.argv.slice(1) });
+    return true;
+  }
+  app.relaunch();
+  return false;
 }
 
 /* ================================================================== *
@@ -783,8 +864,9 @@ function bootstrap() {
     });
   });
 
+  // Ubuntu only: closing the window always quits (no macOS-style dock idle).
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    app.quit();
   });
 }
 
@@ -802,10 +884,18 @@ module.exports = {
   createWindow,
   focusWindow,
   registerIpc,
+  relaunchApp,
   runGitPull,
   readConfig,
+  settingsFile,
+  readSavedRepoPath,
+  saveRepoPath,
   inspectRepo,
+  remoteMatches,
+  pickerDefaultPath,
   buildGitInvocation,
+  buildSpawnOptions,
+  projectLaunchCwd,
   launchProject,
   pipeLines,
   UI_REQUIRED_FILES,
