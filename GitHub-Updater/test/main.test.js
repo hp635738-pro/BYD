@@ -433,8 +433,8 @@ test('createWindow() builds a resizable, maximizable, centred dark window', asyn
   const window = await main.createWindow();
   const o = window.options;
 
-  assert.equal(o.width, 1100);
-  assert.equal(o.height, 760);
+  assert.equal(o.width, 520);
+  assert.equal(o.height, 420);
   assert.equal(o.resizable, true);
   assert.equal(o.maximizable, true);
   assert.equal(o.center, true);

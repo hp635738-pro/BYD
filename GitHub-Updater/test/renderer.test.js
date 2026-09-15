@@ -83,46 +83,43 @@ test('the heading matches the required copy', async () => {
   assert.ok(ui.doc.querySelector('.brand-name'), 'small BYD identity above the title');
 });
 
-test('the repo panel holds the folder picker; Pull and Update sit only below Danger zone', () => {
+test('the repo panel holds the folder picker, then Pull from GitHub above Update', () => {
   const ui = makeRenderer();
+  assert.equal(ui.doc.querySelectorAll('.card').length, 0, 'the heavy dashboard card is gone');
 
   const repoPanel = ui.doc.querySelector('.repo-panel');
   const actions = ui.doc.querySelector('.actions');
-  const danger = ui.doc.getElementById('danger-zone');
   assert.ok(repoPanel, 'subtle glass repository section exists');
   assert.ok(actions, 'lightweight actions stack exists');
-  assert.ok(danger, 'Danger zone exists');
 
-  assert.equal(ui.doc.querySelectorAll('#btn-pull').length, 1, 'exactly one Pull from GitHub button');
-  assert.equal(ui.doc.querySelectorAll('#btn-update').length, 1, 'exactly one Update button');
-  assert.ok(ui.pull.closest('.actions'), 'Pull lives in the actions stack');
-  assert.ok(ui.update.closest('.actions'), 'Update lives in the actions stack');
-  assert.equal(ui.doc.querySelectorAll('.actions').length, 1);
+  const buttons = [...ui.doc.querySelectorAll('button')];
+  assert.equal(buttons.length, 3, 'exactly three buttons in the document');
+  assert.equal(buttons.filter((b) => b.closest('.repo-panel')).length, 1, 'folder picker lives in the repo panel');
+  assert.equal(buttons.filter((b) => b.closest('.actions')).length, 2, 'Pull and Update live in the actions stack');
 
-  assert.equal(ui.doc.getElementById('btn-select').textContent.trim(), 'Choose BYD repository folder');
-  assert.equal(ui.pull.textContent.trim(), 'Pull from GitHub');
-  assert.equal(ui.update.textContent.trim(), 'Update');
+  assert.equal(buttons[0].textContent.trim(), 'Choose BYD repository folder');
+  assert.equal(buttons[1].textContent.trim(), 'Pull from GitHub');
+  assert.equal(buttons[2].textContent.trim(), 'Update');
   assert.equal(
-    ui.pull.compareDocumentPosition(ui.update) & ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
+    buttons[1].compareDocumentPosition(buttons[2]) & ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
     ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
     'Update must come directly after Pull from GitHub'
   );
-  assert.equal(
-    danger.compareDocumentPosition(actions) & ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
-    ui.win.Node.DOCUMENT_POSITION_FOLLOWING,
-    'actions (Pull/Update) sit directly below Danger zone'
-  );
 
+  // The selected path is shown compactly inside the repo panel.
   const repoPath = ui.doc.getElementById('repo-path');
   assert.ok(repoPath.closest('.repo-panel'), 'repository path lives in the repo panel');
 });
 
-test('core action buttons share the Apple-style control look', () => {
+test('all buttons share the same full-width Apple-style control look', () => {
   const ui = makeRenderer();
-  const select = ui.doc.getElementById('btn-select');
-  assert.ok(select.classList.contains('btn') && select.classList.contains('btn-secondary'));
-  assert.ok(ui.pull.classList.contains('btn') && ui.pull.classList.contains('btn-primary'));
-  assert.ok(ui.update.classList.contains('btn') && ui.update.classList.contains('btn-update'));
+  const buttons = [...ui.doc.querySelectorAll('button')];
+  assert.deepEqual(
+    buttons.map((b) => [...b.classList].filter((c) => c.startsWith('btn-')).sort()),
+    [['btn-secondary'], ['btn-primary'], ['btn-update']],
+    'secondary picker, primary red pull button and subtle-red update button'
+  );
+  assert.ok(buttons.every((b) => b.classList.contains('btn')), 'all use the shared .btn class');
   assert.match(CSS, /\.btn\s*\{[^}]*width:\s*100%/s, '.btn is full width, so all buttons are equal width');
 });
 
