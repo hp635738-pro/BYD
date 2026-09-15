@@ -3,56 +3,274 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy"
-          content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;" />
+          content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'none';" />
     <title>BYD</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="shell">
-      <div class="content">
-        <header class="heading">
-          <div class="brand">
-            <span class="brand-dot" aria-hidden="true"></span>
-            <span class="brand-name">BYD</span>
+    <div id="app" class="shell" data-view="settings" data-sidebar="expanded">
+      <aside class="rail" id="rail" aria-label="Navigation">
+        <div class="rail-brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-text">BYD</span>
+        </div>
+        <nav class="rail-nav">
+          <button type="button" class="rail-item" data-nav="overview"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Overview</span></button>
+          <button type="button" class="rail-item" data-nav="schedule"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Analyzing</span></button>
+          <button type="button" class="rail-item" data-nav="cards"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Topics</span></button>
+          <button type="button" class="rail-item" data-nav="reports"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Board</span></button>
+          <button type="button" class="rail-item" data-nav="aiagents"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">AI chats</span></button>
+          <button type="button" class="rail-item" data-nav="codearena"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Code Arena</span></button>
+          <button type="button" class="rail-item" data-nav="messages"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Chats</span><span class="rail-dot" aria-hidden="true"></span></button>
+          <button type="button" class="rail-item" data-nav="assistant"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Assistant</span></button>
+          <button type="button" class="rail-item" data-nav="star"><span class="rail-ico" aria-hidden="true"></span><span class="rail-label">Favourites</span></button>
+        </nav>
+        <button type="button" class="rail-item rail-collapse" id="btn-collapse" title="Collapse sidebar">
+          <span class="rail-label">Collapse</span>
+        </button>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <h1 class="page-title" id="page-title">Settings</h1>
+          <div class="topbar-right">
+            <div class="notch" aria-label="Quick tools">
+              <button type="button" class="notch-btn" data-nav="settings" title="Settings">Settings</button>
+              <button type="button" class="notch-btn" data-nav="files" title="File">File</button>
+            </div>
+            <button type="button" class="icon-btn" data-nav="settings" title="Settings" aria-label="Settings">⚙</button>
+            <button type="button" class="icon-btn" id="btn-runtime" title="Runtime status" aria-label="Runtime status">●</button>
+            <button type="button" class="icon-btn" id="btn-history" title="Chat history" hidden>☰</button>
+            <button type="button" class="icon-btn" id="btn-theme" title="Switch theme">◐</button>
           </div>
-          <h1 class="title">BYD</h1>
-          <p class="subtitle">Update your project directly from GitHub</p>
         </header>
 
-        <!-- Repository picker — subtle glass surface, not a heavy card. -->
-        <section class="repo-panel" aria-label="Repository">
-          <div class="repo-meta">
-            <span class="repo-label">Repository</span>
-            <span id="repo-path" class="repo-path" title="Selected BYD repository"></span>
-          </div>
-          <button id="btn-select" class="btn btn-secondary" type="button">Choose BYD repository folder</button>
-        </section>
+        <div class="views">
+          <!-- Settings (primary BYD surface) -->
+          <section class="view view-settings" data-view-panel="settings">
+            <div class="settings-inner">
+              <header class="heading">
+                <div class="brand">
+                  <span class="brand-dot" aria-hidden="true"></span>
+                  <span class="brand-name">BYD</span>
+                </div>
+                <h1 class="title">BYD</h1>
+                <p class="subtitle">Update your project directly from GitHub</p>
+              </header>
 
-        <!-- Primary actions — lightweight vertical stack, no surrounding panel. -->
-        <section class="actions" aria-label="Update actions">
-          <button id="btn-pull" class="btn btn-primary" type="button">
-            <span class="btn-label">Pull from GitHub</span>
-          </button>
+              <section class="repo-panel" aria-label="Repository">
+                <div class="repo-meta">
+                  <span class="repo-label">Repository</span>
+                  <span id="repo-path" class="repo-path" title="Selected BYD repository"></span>
+                </div>
+                <button id="btn-select" class="btn btn-secondary" type="button">Choose BYD repository folder</button>
+              </section>
 
-          <button id="btn-update" class="btn btn-update" type="button" disabled>
-            <span class="btn-label">Update</span>
-          </button>
-        </section>
+              <section class="card">
+                <h3 class="card-title">Appearance</h3>
+                <p class="card-desc">Theme, accent and layout. Changes apply instantly on this device.</p>
+                <div class="row">
+                  <div>
+                    <div class="row-label">Theme</div>
+                    <div class="row-hint">Dark is the BYD default.</div>
+                  </div>
+                  <div class="seg" id="theme-seg">
+                    <button type="button" data-theme="light">Light</button>
+                    <button type="button" data-theme="dark" class="on">Dark</button>
+                    <button type="button" data-theme="system">System</button>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="row-label">Accent</div>
+                    <div class="row-hint">Highlights and primary controls.</div>
+                  </div>
+                  <div class="swatches" id="accent-swatches">
+                    <button type="button" class="swatch on" data-accent="#E60012" style="background:#E60012" title="BYD red"></button>
+                    <button type="button" class="swatch" data-accent="#2383e2" style="background:#2383e2" title="Blue"></button>
+                    <button type="button" class="swatch" data-accent="#8b5cf6" style="background:#8b5cf6" title="Violet"></button>
+                    <button type="button" class="swatch" data-accent="#10b981" style="background:#10b981" title="Green"></button>
+                    <button type="button" class="swatch" data-accent="#f59e0b" style="background:#f59e0b" title="Amber"></button>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="row-label">Density</div>
+                    <div class="row-hint">Padding and row height.</div>
+                  </div>
+                  <div class="seg" id="density-seg">
+                    <button type="button" data-density="compact">Compact</button>
+                    <button type="button" data-density="comfortable" class="on">Comfortable</button>
+                    <button type="button" data-density="spacious">Spacious</button>
+                  </div>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="row-label">Corner radius</div>
+                    <div class="row-hint" id="radius-hint">12px</div>
+                  </div>
+                  <input type="range" id="radius-slider" min="0" max="26" value="12" />
+                </div>
+              </section>
 
-        <section class="status" aria-live="polite">
-          <div id="status-line" class="status-line" role="status">
-            <span id="status-dot" class="status-dot" aria-hidden="true"></span>
-            <span id="status-text" class="status-text">Ready.</span>
-          </div>
+              <section class="danger" id="danger-zone">
+                <div class="card-head">
+                  <h3 class="card-title danger-title">Danger zone</h3>
+                  <p class="card-desc">Work-in-progress tooling. Advanced appearance controls live here.</p>
+                </div>
+                <button type="button" class="danger-row" id="btn-advanced">
+                  <span>Advanced settings</span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              </section>
 
-          <pre id="output" class="output" hidden></pre>
-        </section>
+              <section class="actions" aria-label="Update actions">
+                <button id="btn-pull" class="btn btn-primary" type="button">
+                  <span class="btn-label">Pull from GitHub</span>
+                </button>
+                <button id="btn-update" class="btn btn-update" type="button" disabled>
+                  <span class="btn-label">Update</span>
+                </button>
+              </section>
 
-        <footer class="footer">
-          <span id="ui-source" class="ui-source" title="Where the interface files currently shown were loaded from"></span>
-        </footer>
+              <section class="status" aria-live="polite">
+                <div id="status-line" class="status-line" role="status">
+                  <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+                  <span id="status-text" class="status-text">Ready.</span>
+                </div>
+                <pre id="output" class="output" hidden></pre>
+              </section>
+
+              <footer class="footer">
+                <span id="ui-source" class="ui-source" title="Where the interface files currently shown were loaded from"></span>
+              </footer>
+            </div>
+          </section>
+
+          <section class="view view-blank" data-view-panel="overview" hidden>
+            <div class="blank-canvas" aria-label="Overview"></div>
+          </section>
+          <section class="view view-blank" data-view-panel="schedule" hidden><div class="blank-canvas"></div></section>
+          <section class="view view-blank" data-view-panel="cards" hidden><div class="blank-canvas"></div></section>
+          <section class="view view-blank" data-view-panel="reports" hidden><div class="blank-canvas"></div></section>
+          <section class="view view-blank" data-view-panel="messages" hidden><div class="blank-canvas"></div></section>
+          <section class="view view-blank" data-view-panel="assistant" hidden><div class="blank-canvas"></div></section>
+          <section class="view view-blank" data-view-panel="star" hidden><div class="blank-canvas"></div></section>
+
+          <section class="view view-chat" data-view-panel="aiagents" hidden>
+            <div class="chat-thread">
+              <div class="chat-empty">Start a conversation. This is a local UI preview — no remote model is called.</div>
+              <div id="chat-list" class="chat-list"></div>
+            </div>
+            <form id="chat-form" class="composer" autocomplete="off">
+              <div class="composer-row">
+                <select id="chat-model" aria-label="Model">
+                  <option value="instant">Instant</option>
+                  <option value="think">Think</option>
+                </select>
+                <button type="button" id="deepthink" class="pill" role="switch" aria-checked="false">DeepThink Off</button>
+              </div>
+              <textarea id="chat-input" rows="2" placeholder="Message…"></textarea>
+              <div class="composer-actions">
+                <button type="button" class="icon-btn" id="chat-attach" title="Attach">+</button>
+                <button type="submit" class="send-btn" id="chat-send">Send</button>
+              </div>
+            </form>
+            <aside class="chat-history" id="chat-history" hidden>
+              <button type="button" id="new-chat" class="btn btn-secondary">New chat</button>
+              <div id="chat-history-list"></div>
+            </aside>
+          </section>
+
+          <section class="view view-code" data-view-panel="codearena" hidden>
+            <div class="center-card">
+              <h2>Code Arena</h2>
+              <p>Workspace preview. The HPOS desktop opener is not part of BYD.</p>
+              <button type="button" class="btn btn-secondary" id="btn-codearena" disabled>Open Code Arena</button>
+            </div>
+          </section>
+
+          <section class="view view-files" data-view-panel="files" hidden>
+            <div class="files-screen">
+              <button type="button" class="btn btn-secondary" data-nav="settings">Back</button>
+              <h2>Files</h2>
+              <p>Your files will appear here. Use Choose BYD repository folder on Settings to pick a clone.</p>
+            </div>
+          </section>
+        </div>
       </div>
-    </main>
+    </div>
+
+    <div id="advanced" class="advanced" hidden>
+      <header class="adv-bar">
+        <button type="button" id="adv-back" class="icon-btn">‹</button>
+        <span>Advanced settings</span>
+        <button type="button" id="adv-cancel" class="btn-ghost">Cancel</button>
+        <button type="button" id="adv-save" class="btn-save">Save</button>
+      </header>
+      <div class="adv-body">
+        <nav class="adv-nav">
+          <input type="search" id="adv-search" placeholder="Find a setting" />
+          <button type="button" class="adv-nav-item on" data-adv="workspaces">Workspaces</button>
+          <button type="button" class="adv-nav-item" data-adv="colours">Theme colours</button>
+          <button type="button" class="adv-nav-item" data-adv="type">System text</button>
+          <button type="button" class="adv-nav-item" data-adv="picker">Colour picker</button>
+          <button type="button" class="adv-nav-item" data-adv="components">Component edit</button>
+          <button type="button" class="adv-nav-item" data-adv="notch">Wide Notch</button>
+          <button type="button" class="adv-nav-item" data-adv="sidebar">Sidebar</button>
+          <button type="button" class="adv-nav-item" data-adv="header">Header</button>
+          <button type="button" class="adv-nav-item" data-adv="palette">Command palette</button>
+          <button type="button" class="adv-nav-item" data-adv="shortcuts">Keyboard shortcuts</button>
+          <button type="button" class="adv-nav-item" data-adv="backup">Backup and reset</button>
+        </nav>
+        <div class="adv-content" id="adv-content">
+          <p id="adv-desc">Save named looks and switch between them.</p>
+          <div class="adv-panel" data-adv-panel="workspaces">
+            <button type="button" class="btn btn-secondary" id="ws-save">Save current look</button>
+            <ul id="ws-list"></ul>
+          </div>
+          <div class="adv-panel" data-adv-panel="colours" hidden>
+            <label>Background <input type="color" id="tok-bg" value="#0B0C0F" /></label>
+            <label>Surface <input type="color" id="tok-surface" value="#12141A" /></label>
+            <label>Text <input type="color" id="tok-text" value="#F5F5F5" /></label>
+          </div>
+          <div class="adv-panel" data-adv-panel="type" hidden>
+            <label>Text size <input type="range" id="font-scale" min="80" max="130" value="100" /></label>
+          </div>
+          <div class="adv-panel" data-adv-panel="picker" hidden><p>Hex colour field uses the OS picker.</p></div>
+          <div class="adv-panel" data-adv-panel="components" hidden><p>Buttons use the shared .btn control.</p></div>
+          <div class="adv-panel" data-adv-panel="notch" hidden>
+            <label><input type="checkbox" id="notch-labels" checked /> Show notch labels</label>
+          </div>
+          <div class="adv-panel" data-adv-panel="sidebar" hidden>
+            <label><input type="checkbox" id="rail-brand" checked /> Show brand</label>
+          </div>
+          <div class="adv-panel" data-adv-panel="header" hidden>
+            <label><input type="checkbox" id="bar-title" checked /> Show page title</label>
+          </div>
+          <div class="adv-panel" data-adv-panel="palette" hidden>
+            <label><input type="checkbox" id="palette-on" checked /> Enable Ctrl+K palette</label>
+          </div>
+          <div class="adv-panel" data-adv-panel="shortcuts" hidden>
+            <p>Record combos locally. Not wired to git actions.</p>
+            <input id="shortcut-record" placeholder="Press keys…" readonly />
+          </div>
+          <div class="adv-panel" data-adv-panel="backup" hidden>
+            <button type="button" class="btn btn-secondary" id="btn-export">Export settings</button>
+            <button type="button" class="btn btn-secondary" id="btn-reset">Reset defaults</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="palette" class="palette" hidden>
+      <div class="palette-box" role="dialog" aria-modal="true" aria-label="Command palette">
+        <input id="palette-input" type="search" placeholder="Search pages, settings and actions…" />
+        <div id="palette-results" class="palette-results"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
 
     <script src="renderer.js"></script>
   </body>
